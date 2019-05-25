@@ -1,3 +1,4 @@
+import sqlite3
 import cherrypy
 import urllib.request
 import json
@@ -5,6 +6,8 @@ import base64
 import nacl.encoding
 import nacl.signing
 import time
+import socket
+import http_funcs
 
 startHTML = "<html><head><title>CS302 example</title><link rel='stylesheet' href='/static/example.css' /></head><body>"
 
@@ -61,13 +64,13 @@ class MainApp(object):
     @cherrypy.expose
     def signin(self, username=None, password=None):
         """Check their name and password and send them either to the main page, or back to the main login screen."""
-        error = ping(username, password)
+        error = authLogin(username, password)
         #error = authoriseUserLogin(username, password)
         if error == 0:
             cherrypy.session['username'] = username
             cherrypy.session['password'] = password          
             addnewPubKey()
-            report()
+            report("online")
             raise cherrypy.HTTPRedirect('/')
         else:
             raise cherrypy.HTTPRedirect('/login?bad_attempt=1')
@@ -86,14 +89,7 @@ class MainApp(object):
         api_broadcast(message)
         raise cherrypy.HTTPRedirect('/')
 
-    @cherrypy.expose
-    @cherrypy.tools.json_in()
-    def rx_message(self):
-        input_json = cherrypy.request.json
-        
 
-        # Responses are serialized to JSON (because of the json_out decorator)
-        return result
     @cherrypy.expose
     def users(self):
         userList = getUserList()
@@ -111,6 +107,7 @@ class MainApp(object):
 ###
 ### Functions only after here
 ###
+
 def generateNewKeyPair():
     privateKey = nacl.signing.SigningKey.generate()
     publicKey = privateKey.verify_key
@@ -118,7 +115,7 @@ def generateNewKeyPair():
 
 
 #Reports that the user is online and lets the login server know what public key they will be using for this session
-def report():
+def report(status):
 
     #Get our needed values
     login_url = "http://cs302.kiwi.land/api/report"
@@ -131,7 +128,8 @@ def report():
     pubkey_hex = publicKey.encode(encoder=nacl.encoding.HexEncoder) 
     pubkey_hex_str = pubkey_hex.decode('utf-8')  
     
-    
+    LOCAL_IP = socket.gethostbyname(socket.gethostname())
+
     #create HTTP BASIC authorization header
     credentials = ('%s:%s' % (username, password))
     b64_credentials = base64.b64encode(credentials.encode('ascii'))
@@ -142,8 +140,9 @@ def report():
 
     payload = {
         "connection_location" : "2",
-        "connection_address"  : "122.57.4.189:41480",
-        "incoming_pubkey"     : pubkey_hex_str
+        "connection_address"  : str(LOCAL_IP),
+        "incoming_pubkey"     : pubkey_hex_str,
+        "status"              : status
 
     }   
 
@@ -171,7 +170,7 @@ def report():
 
 
 #Pings the server with usernamd/password for basic authentiction/login confirmation    
-def ping(username, password):
+def authLogin(username, password):
     login_url = "http://cs302.kiwi.land/api/ping"
     privateKey, publicKey = generateNewKeyPair()
 
@@ -301,21 +300,9 @@ def api_broadcast(message):
         "signature" : signature_hex_str
     }
 
-    print(payload)   
 
-    payload = json.dumps(payload)
 
-    payload = bytes(payload, 'utf-8')
-
-    req = urllib.request.Request(broadcast_url, data=payload, headers=headers)
-    response = urllib.request.urlopen(req)
-    data = response.read() # read the received bytes
-    print(data)
-
-    encoding = response.info().get_content_charset('utf-8') #load encoding if possible (default to utf-8)
-    response.close()
-
-    data = json.loads(data.decode(encoding))
+    data = sendJsonRequest(broadcast_url, payload, headers)
 
     if ( data["response"] == "ok"):
         print("Succesfully broadcasted message")
@@ -335,22 +322,3 @@ def getUserList():
     data = json.loads(data)
 
     return data['users']
-
-def getAuthenticationHeader():
-
-    try:
-        username = cherrypy.session['username']
-        password = cherrypy.session['password']
-
-        #create HTTP BASIC authorization header
-        credentials = ('%s:%s' % (username, password))
-        b64_credentials = base64.b64encode(credentials.encode('ascii'))
-        headers = {
-        'Authorization': 'Basic %s' % b64_credentials.decode('ascii'),
-        'Content-Type' : 'application/json; charset=utf-8',
-        }
-        
-    except KeyError:
-        headers - -1
-
-    return headers

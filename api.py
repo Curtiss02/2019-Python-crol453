@@ -1,3 +1,4 @@
+import sqlite3
 import cherrypy
 import urllib.request
 import json
@@ -5,6 +6,8 @@ import base64
 import nacl.encoding
 import nacl.signing
 import time
+import sqlite3
+
 
 class MainApp(object):
     #CherryPy Configuration
@@ -29,12 +32,11 @@ class MainApp(object):
         return json.dumps(response)
 
     @cherrypy.expose
-    def grab(self):
-        url = "http://192.168.20.13:8080/api/test_url"
+    def test(self):
+        url = "http://192.168.20.13:8080/api/rx_message"
+
         payload = {
-            "connection_location" : "2",
-            "connection_address"  : "122.57.4.189:41480",
-            "incoming_pubkey"     : "123123123123"
+            "message" : "TEST API 123"
         }
         headers = {
             'Content-Type' : 'application/json; charset=utf-8',
@@ -51,15 +53,36 @@ class MainApp(object):
         response.close()
 
         data = json.loads(data.decode(encoding))
-    def test_url(self):
-        """The default page, given when we don't recognise where the request is for."""
-        try:
-            input_json = cherrypy.request.json
-        except:
-            input_json = None
-        print(input_json)
-        response = {
-            "response" : "bad-api-call"
-        }
-        return json.dumps(response)
+
+
+
+    @cherrypy.expose
+    @cherrypy.tools.json_in()
+    def rx_message(self):
+        input_json = cherrypy.request.json
+        
+        msg = input_json['message']
+        
+        result = {"response" : "ok"}
+
+        print(msg)
+
+        # Responses are serialized to JSON (because of the json_out decorator)
+        return json.dumps(result)
+    
+    @cherrypy.expose
+    @cherrypy.tools.json_in()
+    def rx_broadcast(self):
+        input_json = cherrypy.request.json
+        
+        msg = json.loads(input_json)
+
+        msg = msg['message']
+        
+        result = {"response" : "ok"}
+
+        print(msg)
+        
+        # Responses are serialized to JSON (because of the json_out decorator)
+        return json.dumps(result)
         

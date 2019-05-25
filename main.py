@@ -20,6 +20,10 @@ import server
 
 import api
 
+import sqlite3
+
+from sqlite3 import Error
+
 # The address we listen for connections on
  
 #Grabs the primary local IP for the system in order to host the server
@@ -51,10 +55,11 @@ def runMainApp():
         },
         
         #once a favicon is set up, the following code could be used to select it for cherrypy
-        #'/favicon.ico': {
-        #    'tools.staticfile.on': True,
-        #    'tools.staticfile.filename': os.getcwd() + '/static/favicon.ico',
-        #},
+        '/favicon.ico': {
+            'tools.staticfile.on': True,
+            'tools.staticfile.filename': os.getcwd() + '/static/favicon.ico',
+        },
+
     }
 
     cherrypy.site = {
@@ -83,5 +88,18 @@ def runMainApp():
     cherrypy.engine.block()
  
 #Run the function to start everything
+def setupDB():
+    db = os.getcwd() + '/db/stuff.db'       
+    try:
+        conn = sqlite3.connect(db)
+
+                                        
+    except Error as e:
+        print(e)
+    finally:
+        conn.close()
+
+
 if __name__ == '__main__':
+    #setupDB()
     runMainApp()
