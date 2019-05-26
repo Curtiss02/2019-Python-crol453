@@ -1,4 +1,3 @@
-import sqlite3
 import cherrypy
 import urllib.request
 import json
@@ -7,7 +6,7 @@ import nacl.encoding
 import nacl.signing
 import time
 import sqlite3
-
+import sql_funcs
 
 class MainApp(object):
     #CherryPy Configuration
@@ -33,10 +32,13 @@ class MainApp(object):
 
     @cherrypy.expose
     def test(self):
-        url = "http://192.168.20.13:8080/api/rx_message"
+        url = "http://192.168.20.13:8080/api/rx_broadcast"
 
         payload = {
-            "message" : "TEST API 123"
+            "loginserver_record" : "adkjaskldjasldjajklsd1231",
+            "message" : "TEST API 123",
+            "sender_created_at" : "1507832678913.324",
+            "signature" : "hey feller"
         }
         headers = {
             'Content-Type' : 'application/json; charset=utf-8',
@@ -53,6 +55,7 @@ class MainApp(object):
         response.close()
 
         data = json.loads(data.decode(encoding))
+        print(data)
 
 
 
@@ -67,22 +70,30 @@ class MainApp(object):
 
         print(msg)
 
-        # Responses are serialized to JSON (because of the json_out decorator)
         return json.dumps(result)
     
     @cherrypy.expose
+    #allows incoming json data
     @cherrypy.tools.json_in()
     def rx_broadcast(self):
+
         input_json = cherrypy.request.json
-        
-        msg = json.loads(input_json)
+        try:
+            sender_record = input_json['loginserver_record']
+            msg = input_json['message']
+            timestamp = input_json['sender_created_at']
+            sig = input_json['signature']
+            
+        except KeyError:
+            result = {
+                "response" : "error"}
+            return json.dumps(result)
 
-        msg = msg['message']
-        
+        print(sender_record, msg, timestamp, sig)
+        sql_funcs.add_broadcast(sender_record, msg, timestamp, sig)
+       
+
         result = {"response" : "ok"}
-
-        print(msg)
-        
-        # Responses are serialized to JSON (because of the json_out decorator)
         return json.dumps(result)
+
         
