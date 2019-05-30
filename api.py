@@ -7,6 +7,9 @@ import nacl.signing
 import time
 import sqlite3
 import sql_funcs
+import socket
+
+LOCAL_IP = socket.gethostbyname(socket.gethostname()) + ":8080"
 
 class MainApp(object):
     #CherryPy Configuration
@@ -32,7 +35,7 @@ class MainApp(object):
 
     @cherrypy.expose
     def test(self):
-        url = "http://192.168.20.13:8080/api/rx_broadcast"
+        url = "http://" + LOCAL_IP + "/api/rx_broadcast"
 
         payload = {
             "loginserver_record" : "adkjaskldjasldjajklsd1231",
@@ -55,6 +58,7 @@ class MainApp(object):
         response.close()
 
         data = json.loads(data.decode(encoding))
+
         print(data)
 
 

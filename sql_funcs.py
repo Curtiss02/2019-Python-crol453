@@ -33,3 +33,12 @@ def add_broadcast(record, message, timestamp, signature):
     conn.commit()
     print("\nSQL DONE BOSS\n")
     return 1
+
+def get_broadcasts():
+    conn = sqlite3.connect(db)
+    sql = "SELECT * FROM broadcasts"
+    cur = conn.cursor()
+    cur.execute(sql)
+    rows = cur.fetchall()
+    conn.commit()
+    return rows

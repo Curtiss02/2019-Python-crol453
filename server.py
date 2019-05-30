@@ -8,8 +8,64 @@ import nacl.signing
 import time
 import socket
 import http_funcs
+import sql_funcs
+import datetime
 
-startHTML = "<html><head><title>CS302 example</title><link rel='stylesheet' href='/static/example.css' /></head><body>"
+
+startHTML = """<html><head><title>Chatter</title><link rel='stylesheet'type='text/css' href='static/example.css' />
+<style>
+body {
+  margin: 0 auto;
+  max-width: 800px;
+  padding: 0 20px;
+}
+
+.container {
+  border: 2px solid #dedede;
+  background-color: #f1f1f1;
+  border-radius: 5px;
+  padding: 10px;
+  margin: 10px 0;
+}
+
+.darker {
+  border-color: #ccc;
+  background-color: #ddd;
+}
+
+.container::after {
+  content: "";
+  clear: both;
+  display: table;
+}
+
+.container img {
+  float: left;
+  max-width: 60px;
+  width: 100%;
+  margin-right: 20px;
+  border-radius: 50%;
+}
+
+.container img.right {
+  float: right;
+  margin-left: 20px;
+  margin-right:0;
+}
+
+.time-right {
+  float: right;
+  color: #aaa;
+}
+
+.time-left {
+  float: left;
+  color: #999;
+}
+</style></head><body>"""
+
+endHTML = """</body>
+                </html>"""
 
 class MainApp(object):
 
@@ -23,7 +79,7 @@ class MainApp(object):
     @cherrypy.expose
     def default(self, *args, **kwargs):
         """The default page, given when we don't recognise where the request is for."""
-        Page = startHTML + "I don't know where you're trying to go, so have a 404 Error."
+        Page = startHTML + "<h1>404 ERROR</h1>"
         cherrypy.response.status = 404
         return Page
 
@@ -37,8 +93,8 @@ class MainApp(object):
             Page += '<form action="/broadcast" method="post" enctype="multipart/form-data">'
             Page += 'Message: <input type="text" name="message"/><br/>'
             Page += '<input type="submit" value="Broadcast Message"/></form>'
+            Page += displayBroadcasts()
         except KeyError: #There is no username
-            
             Page += "<a href='login'><button type=\"button\">Login</button></a>"
         return Page
         
@@ -302,7 +358,7 @@ def api_broadcast(message):
 
 
 
-    data = sendJsonRequest(broadcast_url, payload, headers)
+    data = http_funcs.sendJsonRequest(broadcast_url, payload, headers)
 
     if ( data["response"] == "ok"):
         print("Succesfully broadcasted message")
@@ -322,3 +378,28 @@ def getUserList():
     data = json.loads(data)
 
     return data['users']
+def displayBroadcasts():
+    broadcasts = sql_funcs.get_broadcasts()
+    html = ""
+    #Format is (Loginserver_recod, message, timestamp, signature)
+    for row in broadcasts:
+        print(row)
+        message = row[1]
+        username = row[0].split(',')[0]
+        timestamp = row[2]
+        #timestring = datetime.datetime.fromtimestamp(int(float(timestamp))).strftime('%Y-%m-d %H:%M:%S')
+
+        html += """ <div class="container">
+	                <p>"""
+        html +=  message 
+        html +=  """</p>
+	                <span class="time-right">""" 
+        html += username 
+        html += ": " 
+        html += timestamp 
+        html += """</span>
+        	     </div> """
+                
+    return html
+
+        
