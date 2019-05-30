@@ -11,6 +11,8 @@ import socket
 
 LOCAL_IP = socket.gethostbyname(socket.gethostname()) + ":8080"
 
+
+
 class MainApp(object):
     #CherryPy Configuration
     _cp_config = {'tools.encode.on': True, 

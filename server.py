@@ -11,12 +11,28 @@ import http_funcs
 import sql_funcs
 import datetime
 import cgi
+import html_strings
 
+LOCAL_IP = socket.gethostbyname(socket.gethostname()) + ":8080"
+EXTERNALIP = urllib.request.Request("https://api.ipify.org")
+EXTERNALIP = urllib.request.urlopen(EXTERNALIP)
+EXTERNALIP = EXTERNALIP.read().decode('utf-8')
+#server_location = input("Enter server location (lab-pc:0, uni-wifi:1, external-ip:2: ")
+SERVER_IP = LOCAL_IP
 
-startHTML = """<html><head><title>Chatter</title><link rel='stylesheet'type='text/css' href='static/example.css' /></head><body>"""
+#if (server_location == 0 or server_location == 1):
+#    SERVER_IP = LOCAL_IP
+#elif (server_location == 2):
+#    SERVER_IP = EXTERNALIP
 
-endHTML = """</body>
+startHTML = """<html><head><title>Chatter</title><link rel='stylesheet'type='text/css' href='static/example.css' /><link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous"></head><body>"""
+
+endHTML = """<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+            <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script></body>
                 </html>"""
+
+
 
 class MainApp(object):
 
@@ -37,42 +53,68 @@ class MainApp(object):
     # PAGES (which return HTML that can be viewed in browser)
     @cherrypy.expose
     def index(self):
-        Page = startHTML + "Welcome to Chatter<br/>"
-        try:
+        if(cherrypy.session.get('username') == None):
+            raise cherrypy.HTTPRedirect('/login')
+        else:
+            Page = startHTML 
+            Page += html_strings.getNavbar(cherrypy.session['username'])
+                
+            Page += html_strings.jumbotron
+
             Page += "Hello " + cherrypy.session['username'] + "!<br/>"
             Page += "Here is some bonus text because you've logged in! <a href='/signout'>Sign out</a><br/>"
             Page += '<form action="/broadcast" method="post" enctype="multipart/form-data">'
             Page += 'Message: <input type="text" name="message"/><br/>'
             Page += '<input type="submit" value="Broadcast Message"/></form>'
             Page += displayBroadcasts()
-        except KeyError: #There is no username
-            Page += "<a href='login'><button type=\"button\">Login</button></a>"
+            getUserList()
+
         return Page
         
     @cherrypy.expose
     def login(self, bad_attempt = 0):
         Page = startHTML 
+        Page += html_strings.jumbotron_login
+        Page += """ <div class="container">
+                    <div class=".col-sm-">
+                    
+                    """
         if bad_attempt != 0:
             Page += "<font color='red'>Invalid username/password!</font>"
-            
-        Page += '<form action="/signin" method="post" enctype="multipart/form-data">'
-        Page += 'Username: <input type="text" name="username"/><br/>'
-        Page += 'Password: <input type="text" name="password"/>'
-        Page += '<input type="submit" value="Login"/></form>'
+        Page += """<form action="/signin" method="post" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="inputUsername">Username</label>
+                    <input type="text" name="username" class="form-control" id="inputUsername" aria-describedby="usernameHelp" placeholder="Enter username">
+                    <small id="usernameHelp" class="form-text text-muted">Username is your UPI.</small>
+                </div>
+                <div class="form-group">
+                    <label for="inputPassword">Password</label>
+                    <input type="password" name="password" class="form-control" id="inputPassword" placeholder="Password">
+                </div>
+                <div class="form-check">
+                    <input type="checkbox" name="hidden" class="form-check-input" id="hiddenmode">
+                    <label class="form-check-label" for="hiddenmode">Hidden from Online User List (No Report)</label>
+                </div>
+                <button type="submit" class="btn btn-primary">Submit</button>
+                </form>
+                </div></div>"""
 
         return Page
         
     # LOGGING IN AND OUT
     @cherrypy.expose
-    def signin(self, username=None, password=None):
+    def signin(self, username=None, password=None, hidden = None):
         """Check their name and password and send them either to the main page, or back to the main login screen."""
         error = authLogin(username, password)
         #error = authoriseUserLogin(username, password)
         if error == 0:
-            cherrypy.session['username'] = username
+            cherrypy.session['username'] = cgi.escape(username)
             cherrypy.session['password'] = password          
             addnewPubKey()
-            report("online")
+            if(hidden == "on"):
+                report("offline")
+            else:
+                report("online")
             raise cherrypy.HTTPRedirect('/')
         else:
             raise cherrypy.HTTPRedirect('/login?bad_attempt=1')
@@ -96,10 +138,10 @@ class MainApp(object):
     def users(self):
         userList = getUserList()
         Page = startHTML
-        for user in userList:
-            print(user['username'])
-            timeSinceActivity = round((time.time() - float(user['connection_updated_at']))/60)
-            print(timeSinceActivity, "minutes since last activity\n")
+        Page += html_strings.getNavbar(cherrypy.session['username'])
+        Page += displayUserList(userList)
+
+        return Page
 
     
 
@@ -142,7 +184,7 @@ def report(status):
 
     payload = {
         "connection_location" : "2",
-        "connection_address"  : str(LOCAL_IP),
+        "connection_address"  : str(SERVER_IP),
         "incoming_pubkey"     : pubkey_hex_str,
         "status"              : status
 
@@ -316,14 +358,11 @@ def api_broadcast(message):
 def getUserList():
     url = "http://cs302.kiwi.land/api/list_users"
 
-    headers = getAuthenticationHeader()
-    req = urllib.request.Request(url, headers=headers)
-    response = urllib.request.urlopen(req)
-    data = response.read()
-    print(data)
-    data = json.loads(data)
-
+    headers = http_funcs.getAuthenticationHeader()
+    data = http_funcs.sendJsonRequest(url, None, headers)
+    print(data['users'])
     return data['users']
+
 def displayBroadcasts():
     broadcasts = sql_funcs.get_broadcasts()
     html = ""
@@ -352,4 +391,34 @@ def displayBroadcasts():
                 
     return html
 
+def displayUserList(userList):
+    html = """<table class="table">
+    <thead class="thead-dark">
+    <tr>
+    <th scope="col">Username</th>
+    <th scope="col">Connection Address</th>
+    <th scope="col">Connection Location</th>
+    <th scope="col">Public Key</th>
+    <th scope="col">Last Seen</th>
+    <th scope="col">Status</th>
+    </tr>
+    </thead>
+    <tbody>"""
+
+    for user in userList:
+        html += "<tr>"
+        username = cgi.escape((user['username']))
+        timeSinceActivity =  cgi.escape(str(round((time.time() - float(user['connection_updated_at']))/60)) + "minutes ago")
+        connection_address = cgi.escape(user['connection_address'])
+        connection_location = cgi.escape(user['connection_location'])
+        pubkey = cgi.escape(user['incoming_pubkey'])
+        status = cgi.escape(user['status'])
+        html += "<th scope=\"row\">" + username + "</th>"
+        html += "<td>" + connection_address + "</td>"
+        html += "<td>" + connection_location + "</td>"
+        html += "<td>" + pubkey + "</td>"
+        html += "<td>" + timeSinceActivity + "</td>"
+        html += "<td>" + status + "</td>"
+        html += "</tr>"
+    return html
         

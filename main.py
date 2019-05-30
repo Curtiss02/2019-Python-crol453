@@ -27,9 +27,8 @@ from sqlite3 import Error
 # The address we listen for connections on
  
 #Grabs the primary local IP for the system in order to host the server
-LOCAL_IP = socket.gethostbyname(socket.gethostname())
 
-LISTEN_IP = LOCAL_IP
+LISTEN_IP = "0.0.0.0"
 LISTEN_PORT = 8080
 
 def runMainApp():
