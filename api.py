@@ -35,12 +35,13 @@ class MainApp(object):
 
     @cherrypy.expose
     def test(self):
-        url = "http://" + LOCAL_IP + "/api/rx_broadcast"
 
+        url = "http://" + LOCAL_IP + "/api/rx_broadcast"
+        timestamp = str(time.time())
         payload = {
             "loginserver_record" : "adkjaskldjasldjajklsd1231",
             "message" : "TEST API 123",
-            "sender_created_at" : "1507832678913.324",
+            "sender_created_at" : timestamp,
             "signature" : "hey feller"
         }
         headers = {

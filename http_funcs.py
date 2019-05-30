@@ -47,5 +47,4 @@ def getAuthenticationHeader():
         
     except KeyError:
         headers - -1
-
     return headers

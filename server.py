@@ -10,59 +10,10 @@ import socket
 import http_funcs
 import sql_funcs
 import datetime
+import cgi
 
 
-startHTML = """<html><head><title>Chatter</title><link rel='stylesheet'type='text/css' href='static/example.css' />
-<style>
-body {
-  margin: 0 auto;
-  max-width: 800px;
-  padding: 0 20px;
-}
-
-.container {
-  border: 2px solid #dedede;
-  background-color: #f1f1f1;
-  border-radius: 5px;
-  padding: 10px;
-  margin: 10px 0;
-}
-
-.darker {
-  border-color: #ccc;
-  background-color: #ddd;
-}
-
-.container::after {
-  content: "";
-  clear: both;
-  display: table;
-}
-
-.container img {
-  float: left;
-  max-width: 60px;
-  width: 100%;
-  margin-right: 20px;
-  border-radius: 50%;
-}
-
-.container img.right {
-  float: right;
-  margin-left: 20px;
-  margin-right:0;
-}
-
-.time-right {
-  float: right;
-  color: #aaa;
-}
-
-.time-left {
-  float: left;
-  color: #999;
-}
-</style></head><body>"""
+startHTML = """<html><head><title>Chatter</title><link rel='stylesheet'type='text/css' href='static/example.css' /></head><body>"""
 
 endHTML = """</body>
                 </html>"""
@@ -86,7 +37,7 @@ class MainApp(object):
     # PAGES (which return HTML that can be viewed in browser)
     @cherrypy.expose
     def index(self):
-        Page = startHTML + "Welcome! This is a test website for COMPSYS302!<br/>"
+        Page = startHTML + "Welcome to Chatter<br/>"
         try:
             Page += "Hello " + cherrypy.session['username'] + "!<br/>"
             Page += "Here is some bonus text because you've logged in! <a href='/signout'>Sign out</a><br/>"
@@ -110,11 +61,6 @@ class MainApp(object):
         Page += '<input type="submit" value="Login"/></form>'
 
         return Page
-    
-    @cherrypy.expose    
-    def sum(self, a=0, b=0): #All inputs are strings by default
-        output = int(a)+int(b)
-        return str(output)
         
     # LOGGING IN AND OUT
     @cherrypy.expose
@@ -382,21 +328,25 @@ def displayBroadcasts():
     broadcasts = sql_funcs.get_broadcasts()
     html = ""
     #Format is (Loginserver_recod, message, timestamp, signature)
+    html += "<h1>Public Broadcasts</h1>"
     for row in broadcasts:
         print(row)
         message = row[1]
         username = row[0].split(',')[0]
         timestamp = row[2]
-        #timestring = datetime.datetime.fromtimestamp(int(float(timestamp))).strftime('%Y-%m-d %H:%M:%S')
+        int_timestamp = int(float(timestamp))
+        print(int_timestamp)
+        
+        readable_timestamp = time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime(int_timestamp))
 
         html += """ <div class="container">
 	                <p>"""
-        html +=  message 
+        html +=  cgi.escape(message) 
         html +=  """</p>
 	                <span class="time-right">""" 
-        html += username 
+        html += cgi.escape(username) 
         html += ": " 
-        html += timestamp 
+        html += readable_timestamp 
         html += """</span>
         	     </div> """
                 
