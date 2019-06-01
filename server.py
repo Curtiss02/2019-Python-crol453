@@ -18,7 +18,7 @@ EXTERNALIP = urllib.request.Request("https://api.ipify.org")
 EXTERNALIP = urllib.request.urlopen(EXTERNALIP)
 EXTERNALIP = EXTERNALIP.read().decode('utf-8')
 #server_location = input("Enter server location (lab-pc:0, uni-wifi:1, external-ip:2: ")
-SERVER_IP = LOCAL_IP
+SERVER_IP = EXTERNALIP
 
 #if (server_location == 0 or server_location == 1):
 #    SERVER_IP = LOCAL_IP
@@ -148,8 +148,6 @@ def report(status):
     pubkey_hex = publicKey.encode(encoder=nacl.encoding.HexEncoder) 
     pubkey_hex_str = pubkey_hex.decode('utf-8')  
     
-    LOCAL_IP = socket.gethostbyname(socket.gethostname())
-
     #create HTTP BASIC authorization header
     headers = http_funcs.getAuthenticationHeader()
 

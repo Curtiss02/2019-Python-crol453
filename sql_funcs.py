@@ -27,8 +27,8 @@ def add_broadcast(record, message, timestamp, signature):
     cur = conn.cursor()
     cur.execute(sql, data)
     conn.commit()
-    print("\nSQL DONE BOSS\n")
-        
+
+
     return 1
 def add_user_info(username, apikey, OTPsecret = None):
     return 1

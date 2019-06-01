@@ -31,7 +31,6 @@ class MainApp(object):
             input_json = cherrypy.request.json
         except:
             input_json = None
-        print(input_json)
         response = {
             "response" : "bad-api-call"
         }
@@ -64,7 +63,7 @@ class MainApp(object):
 
         data = json.loads(data.decode(encoding))
 
-        print(data)
+
 
 
 
@@ -77,7 +76,6 @@ class MainApp(object):
         
         result = {"response" : "ok"}
 
-        print(msg)
 
         return json.dumps(result)
     
