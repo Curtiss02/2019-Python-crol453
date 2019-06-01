@@ -22,7 +22,10 @@ import api
 
 import sqlite3
 
+import reporter
+
 from sqlite3 import Error
+
 
 # The address we listen for connections on
  
@@ -79,7 +82,8 @@ def runMainApp():
     #cherrypy.tools.auth = cherrypy.Tool('before_handler', auth.check_auth, 99)
 
     print("Curtiss Rollinson Python Webserver")                 
-    
+    cherrypy.engine.reporter = cherrypy.process.plugins.BackgroundTask(60, reporter.main)
+    cherrypy.engine.reporter.start()
     # Start the web server
     cherrypy.engine.start()
 

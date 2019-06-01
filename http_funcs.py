@@ -7,9 +7,10 @@ import time
 import socket
 
 def sendJsonRequest(url,payload, header):
-    """Sends a request to the specified URL with the given header(dict) and payload(dict).
+    '''
+        Sends a request to the specified URL with the given header(dict) and payload(dict).
         Returns the response in python dict format
-    """
+    '''
 
     payload = json.dumps(payload)
 
@@ -35,16 +36,15 @@ def getAuthenticationHeader():
 
     try:
         username = cherrypy.session['username']
-        password = cherrypy.session['password']
+        apikey = cherrypy.session['api_key']
 
-        #create HTTP BASIC authorization header
-        credentials = ('%s:%s' % (username, password))
-        b64_credentials = base64.b64encode(credentials.encode('ascii'))
+
         headers = {
-        'Authorization': 'Basic %s' % b64_credentials.decode('ascii'),
-        'Content-Type' : 'application/json; charset=utf-8',
+        'X-username' : str(username),
+        'X-apikey' : str(apikey),
+        'Content-Type' : 'application/json; charset=utf-8'
         }
         
     except KeyError:
-        headers - -1
+        headers = -1
     return headers

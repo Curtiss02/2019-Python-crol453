@@ -8,6 +8,8 @@ import time
 import sqlite3
 import sql_funcs
 import socket
+import time
+
 
 LOCAL_IP = socket.gethostbyname(socket.gethostname()) + ":8080"
 
@@ -85,6 +87,7 @@ class MainApp(object):
     def rx_broadcast(self):
 
         input_json = cherrypy.request.json
+        
         try:
             sender_record = input_json['loginserver_record']
             msg = input_json['message']
@@ -102,5 +105,28 @@ class MainApp(object):
 
         result = {"response" : "ok"}
         return json.dumps(result)
+    
+    @cherrypy.expose
+    #allows incoming json data
+    @cherrypy.tools.json_in()
+    def ping_check(self):
+        try:
+            input_json = cherrypy.request.json
+        except:
+            return json.dumps({"response" : "error", "message" : "invalid json"})
+        try:
+            ping_time = input_json['my_time']
+            connection_address = input_json['connection_address']
+            connection_location = input_json['connection_location']
+            response = "ok"
+            message = "success"
+        except KeyError:
+            response = "error"
+            message = "missing field"
+                   
+        time =  str(time.time())
+        result = {"response" : response, "message": message, "my_time": time}
+        return json.dumps(result)
+
 
         

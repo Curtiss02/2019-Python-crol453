@@ -60,14 +60,10 @@ class MainApp(object):
             Page += html_strings.getNavbar(cherrypy.session['username'])
                 
             Page += html_strings.jumbotron
-
-            Page += "Hello " + cherrypy.session['username'] + "!<br/>"
-            Page += "Here is some bonus text because you've logged in! <a href='/signout'>Sign out</a><br/>"
             Page += '<form action="/broadcast" method="post" enctype="multipart/form-data">'
             Page += 'Message: <input type="text" name="message"/><br/>'
             Page += '<input type="submit" value="Broadcast Message"/></form>'
             Page += displayBroadcasts()
-            getUserList()
 
         return Page
         
@@ -81,35 +77,17 @@ class MainApp(object):
                     """
         if bad_attempt != 0:
             Page += "<font color='red'>Invalid username/password!</font>"
-        Page += """<form action="/signin" method="post" enctype="multipart/form-data">
-                <div class="form-group">
-                    <label for="inputUsername">Username</label>
-                    <input type="text" name="username" class="form-control" id="inputUsername" aria-describedby="usernameHelp" placeholder="Enter username">
-                    <small id="usernameHelp" class="form-text text-muted">Username is your UPI.</small>
-                </div>
-                <div class="form-group">
-                    <label for="inputPassword">Password</label>
-                    <input type="password" name="password" class="form-control" id="inputPassword" placeholder="Password">
-                </div>
-                <div class="form-check">
-                    <input type="checkbox" name="hidden" class="form-check-input" id="hiddenmode">
-                    <label class="form-check-label" for="hiddenmode">Hidden from Online User List (No Report)</label>
-                </div>
-                <button type="submit" class="btn btn-primary">Submit</button>
-                </form>
-                </div></div>"""
+        Page += html_strings.login_form
 
         return Page
         
-    # LOGGING IN AND OUT
+    # LOGGING IN 
     @cherrypy.expose
     def signin(self, username=None, password=None, hidden = None):
         """Check their name and password and send them either to the main page, or back to the main login screen."""
         error = authLogin(username, password)
         #error = authoriseUserLogin(username, password)
-        if error == 0:
-            cherrypy.session['username'] = cgi.escape(username)
-            cherrypy.session['password'] = password          
+        if error == 0:  
             addnewPubKey()
             if(hidden == "on"):
                 report("offline")
@@ -130,13 +108,14 @@ class MainApp(object):
         raise cherrypy.HTTPRedirect('/')
     @cherrypy.expose
     def broadcast(self, message=None):
-        api_broadcast(message)
+        send_broadcast(message, "172.23.8.206:8080")
         raise cherrypy.HTTPRedirect('/')
 
 
     @cherrypy.expose
     def users(self):
         userList = getUserList()
+        sql_funcs.updateUserList(userList)
         Page = startHTML
         Page += html_strings.getNavbar(cherrypy.session['username'])
         Page += displayUserList(userList)
@@ -163,10 +142,7 @@ def report(status):
 
     #Get our needed values
     login_url = "http://cs302.kiwi.land/api/report"
-    privateKey = cherrypy.session['privateKey']
     publicKey = cherrypy.session['publicKey']
-    username = cherrypy.session['username']
-    password = cherrypy.session['password']
 
     #Turn our public key into a hex eoncoded string
     pubkey_hex = publicKey.encode(encoder=nacl.encoding.HexEncoder) 
@@ -175,34 +151,17 @@ def report(status):
     LOCAL_IP = socket.gethostbyname(socket.gethostname())
 
     #create HTTP BASIC authorization header
-    credentials = ('%s:%s' % (username, password))
-    b64_credentials = base64.b64encode(credentials.encode('ascii'))
-    headers = {
-        'Authorization': 'Basic %s' % b64_credentials.decode('ascii'),
-        'Content-Type' : 'application/json; charset=utf-8',
-    }
+    headers = http_funcs.getAuthenticationHeader()
 
     payload = {
-        "connection_location" : "2",
+        "connection_location" : "1",
         "connection_address"  : str(SERVER_IP),
         "incoming_pubkey"     : pubkey_hex_str,
         "status"              : status
 
     }   
 
-    payload = json.dumps(payload)
-
-    payload = bytes(payload, 'utf-8')
-
-
-    req = urllib.request.Request(login_url, data=payload, headers=headers)
-    response = urllib.request.urlopen(req)
-
-    data = response.read() # read the received bytes
-    encoding = response.info().get_content_charset('utf-8') #load encoding if possible (default to utf-8)
-    response.close()
-
-    data = json.loads(data.decode(encoding))
+    data = http_funcs.sendJsonRequest(login_url, payload, headers)
 
     if ( data["response"] == "ok"):
         print("\nSuccess reporting !!!\n")
@@ -216,13 +175,8 @@ def report(status):
 #Pings the server with usernamd/password for basic authentiction/login confirmation    
 def authLogin(username, password):
     login_url = "http://cs302.kiwi.land/api/ping"
-    privateKey, publicKey = generateNewKeyPair()
-
-    pubkey_hex = publicKey.encode(encoder=nacl.encoding.HexEncoder) 
-    pubkey_hex_str = pubkey_hex.decode('utf-8')  
-    
-    
-    #create HTTP BASIC authorization header
+   
+    # Creates basic header for intial authorisation
     credentials = ('%s:%s' % (username, password))
     b64_credentials = base64.b64encode(credentials.encode('ascii'))
     headers = {
@@ -230,29 +184,17 @@ def authLogin(username, password):
         'Content-Type' : 'application/json; charset=utf-8',
     }
 
-    payload = {
-
-    }   
-
-    payload = json.dumps(payload)
-
-    payload = bytes(payload, 'utf-8')
-
-
-    req = urllib.request.Request(login_url, data = payload, headers=headers)
-    response = urllib.request.urlopen(req)
-
-    data = response.read() # read the received bytes
-    encoding = response.info().get_content_charset('utf-8') #load encoding if possible (default to utf-8)
-    response.close()
-
-    data = json.loads(data.decode(encoding))
-    print(data)
+    data = http_funcs.sendJsonRequest(login_url, None, headers)
     if ( data["authentication"] == "basic"):
-        print("Success")
-        return 0
+        url = "http://cs302.kiwi.land/api/load_new_apikey"
+        data = http_funcs.sendJsonRequest(url, None, headers)
+        if(data["response"] == "ok"):
+            cherrypy.session['username'] = username
+            cherrypy.session['api_key'] = data['api_key']
+            return 0
+        else:
+            return 1
     else:
-        print("Failure")
         return 1
 
 
@@ -261,7 +203,6 @@ def authLogin(username, password):
 def addnewPubKey():
     privateKey, publicKey = generateNewKeyPair()
     username = cherrypy.session['username']
-    password = cherrypy.session['password']
 
     pubkey_hex = publicKey.encode(encoder=nacl.encoding.HexEncoder) 
     pubkey_hex_str = pubkey_hex.decode('utf-8')  
@@ -272,12 +213,7 @@ def addnewPubKey():
     addkey_url = "http://cs302.kiwi.land/api/add_pubkey"
 
     #create HTTP BASIC authorization header
-    credentials = ('%s:%s' % (username, password))
-    b64_credentials = base64.b64encode(credentials.encode('ascii'))
-    headers = {
-        'Authorization': 'Basic %s' % b64_credentials.decode('ascii'),
-        'Content-Type' : 'application/json; charset=utf-8',
-    }
+    headers = http_funcs.getAuthenticationHeader()
 
     payload = {
         "pubkey" : pubkey_hex_str,
@@ -285,19 +221,8 @@ def addnewPubKey():
         "signature" : signature_hex_str
     }   
 
-    payload = json.dumps(payload)
+    data = http_funcs.sendJsonRequest(addkey_url, payload, headers)
 
-    payload = bytes(payload, 'utf-8')
-
-    req = urllib.request.Request(addkey_url, data=payload, headers=headers)
-    response = urllib.request.urlopen(req)
-
-    data = response.read() # read the received bytes
-    encoding = response.info().get_content_charset('utf-8') #load encoding if possible (default to utf-8)
-    response.close()
-
-    data = json.loads(data.decode(encoding))
-    print(data)
     if ( data["loginserver_record"]):
         print("ADD PUBKEY SUCESS")
         cherrypy.session['privateKey'] = privateKey
@@ -313,12 +238,11 @@ def addnewPubKey():
 
 
 
-def api_broadcast(message):
+def send_broadcast(message, ip):
     privateKey = cherrypy.session['privateKey']
     publicKey = cherrypy.session['publicKey']
 
     username = cherrypy.session['username']
-    password = cherrypy.session['password']
     timestamp = time.time()
 
 
@@ -327,15 +251,12 @@ def api_broadcast(message):
     signed = privateKey.sign(message_bytes, encoder=nacl.encoding.HexEncoder) 
     signature_hex_str = signed.signature.decode('utf-8')
 
-    broadcast_url = "http://cs302.kiwi.land/api/rx_broadcast"
+    broadcast_url = "http://" + ip + "/api/rx_broadcast"
 
+
+        
     #create HTTP BASIC authorization header
-    credentials = ('%s:%s' % (username, password))
-    b64_credentials = base64.b64encode(credentials.encode('ascii'))
-    headers = {
-        'Authorization': 'Basic %s' % b64_credentials.decode('ascii'),
-        'Content-Type' : 'application/json; charset=utf-8',
-    }
+    headers = http_funcs.getAuthenticationHeader()
 
     payload = {
         "loginserver_record" : cherrypy.session['loginserver_record'],
@@ -345,8 +266,10 @@ def api_broadcast(message):
     }
 
 
-
-    data = http_funcs.sendJsonRequest(broadcast_url, payload, headers)
+    try:
+        data = http_funcs.sendJsonRequest(broadcast_url, payload, headers)
+    except:
+        return 1
 
     if ( data["response"] == "ok"):
         print("Succesfully broadcasted message")
@@ -360,7 +283,6 @@ def getUserList():
 
     headers = http_funcs.getAuthenticationHeader()
     data = http_funcs.sendJsonRequest(url, None, headers)
-    print(data['users'])
     return data['users']
 
 def displayBroadcasts():
@@ -369,12 +291,10 @@ def displayBroadcasts():
     #Format is (Loginserver_recod, message, timestamp, signature)
     html += "<h1>Public Broadcasts</h1>"
     for row in broadcasts:
-        print(row)
         message = row[1]
         username = row[0].split(',')[0]
         timestamp = row[2]
         int_timestamp = int(float(timestamp))
-        print(int_timestamp)
         
         readable_timestamp = time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime(int_timestamp))
 
@@ -410,7 +330,7 @@ def displayUserList(userList):
         username = cgi.escape((user['username']))
         timeSinceActivity =  cgi.escape(str(round((time.time() - float(user['connection_updated_at']))/60)) + "minutes ago")
         connection_address = cgi.escape(user['connection_address'])
-        connection_location = cgi.escape(user['connection_location'])
+        connection_location = cgi.escape(str(user['connection_location']))
         pubkey = cgi.escape(user['incoming_pubkey'])
         status = cgi.escape(user['status'])
         html += "<th scope=\"row\">" + username + "</th>"
@@ -421,4 +341,5 @@ def displayUserList(userList):
         html += "<td>" + status + "</td>"
         html += "</tr>"
     return html
+
         
