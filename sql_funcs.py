@@ -4,16 +4,38 @@ db = os.getcwd() + '/db/stuff.db'
 
 
 
-def create_user(username):
+def add_user(username, api_key, public_key, private_key, loginserver_record):
 
-
+    data = (username, api_key, public_key, private_key, loginserver_record)
     conn = sqlite3.connect(db)
-    sql = ''' INSERT INTO users(username)
-              VALUES(?) '''
+    sql = ''' INSERT INTO users(username, api_key, public_key, private_key, loginserver_record)
+              VALUES(?,?,?,?,?) '''
     cur = conn.cursor()
-    cur.execute(sql, username)
+    cur.execute(sql, data)
     conn.commit()
+def remove_user(username):
 
+    sql = '''DELETE FROM users WHERE username=?'''
+    conn = sqlite3.connect(db)
+    cur = conn.cursor()
+    cur.execute(sql, [username])
+    conn.commit()
+def get_user(username):
+    sql = '''SELECT * FROM users WHERE username=?'''
+    conn = sqlite3.connect(db)
+    cur = conn.cursor()
+    cur.execute(sql, [username])
+    user = cur.fetchall()
+    conn.commit()
+    return user
+def get_all_users():
+    sql = '''SELECT * FROM users'''
+    conn = sqlite3.connect(db)
+    cur = conn.cursor()
+    cur.execute(sql)
+    users = cur.fetchall()
+    conn.commit()
+    return users
 
 def add_broadcast(record, message, timestamp, signature):
     """
@@ -30,8 +52,7 @@ def add_broadcast(record, message, timestamp, signature):
 
 
     return 1
-def add_user_info(username, apikey, OTPsecret = None):
-    return 1
+
 
 def updateUserList(userList):
     for user in userList:

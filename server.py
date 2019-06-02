@@ -12,18 +12,15 @@ import sql_funcs
 import datetime
 import cgi
 import html_strings
+import markdown
+from threading import Thread
 
-LOCAL_IP = socket.gethostbyname(socket.gethostname()) + ":8080"
-EXTERNALIP = urllib.request.Request("https://api.ipify.org")
-EXTERNALIP = urllib.request.urlopen(EXTERNALIP)
-EXTERNALIP = EXTERNALIP.read().decode('utf-8')
-#server_location = input("Enter server location (lab-pc:0, uni-wifi:1, external-ip:2: ")
-SERVER_IP = EXTERNALIP
-
-#if (server_location == 0 or server_location == 1):
-#    SERVER_IP = LOCAL_IP
-#elif (server_location == 2):
-#    SERVER_IP = EXTERNALIP
+SERVER_IP = ''
+LOCATION = ''
+with open('cfg/ip.ini') as json_file:
+    ip_data = json.load(json_file)
+    SERVER_IP = ip_data['SERVER_IP']
+    SERVER_LOCATION = ip_data['SERVER_LOCATION']
 
 startHTML = """<html><head><title>Chatter</title><link rel='stylesheet'type='text/css' href='static/example.css' /><link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous"></head><body>"""
 
@@ -87,8 +84,17 @@ class MainApp(object):
         """Check their name and password and send them either to the main page, or back to the main login screen."""
         error = authLogin(username, password)
         #error = authoriseUserLogin(username, password)
-        if error == 0:  
-            addnewPubKey()
+        if error == 0: 
+            userinfo = sql_funcs.get_user(username)
+            print(userinfo)
+            if(len(userinfo) != 0):
+                
+
+                cherrypy.session['private_key'] = nacl.signing.SigningKey(userinfo[0][3], encoder=nacl.encoding.HexEncoder)
+                cherrypy.session['public_key'] = cherrypy.session['private_key'].verify_key
+                cherrypy.session['loginserver_record'] = userinfo[0][4] 
+            else:
+                addnewPubKey()
             if(hidden == "on"):
                 report("offline")
             else:
@@ -104,11 +110,13 @@ class MainApp(object):
         if username is None:
             pass
         else:
+            sql_funcs.remove_user(username)
             cherrypy.lib.sessions.expire()
         raise cherrypy.HTTPRedirect('/')
     @cherrypy.expose
     def broadcast(self, message=None):
-        send_broadcast(message, "172.23.8.206:8080")
+        if message != "":
+            send_broadcast(message)
         raise cherrypy.HTTPRedirect('/')
 
 
@@ -142,17 +150,17 @@ def report(status):
 
     #Get our needed values
     login_url = "http://cs302.kiwi.land/api/report"
-    publicKey = cherrypy.session['publicKey']
+    publicKey = cherrypy.session['public_key']
 
     #Turn our public key into a hex eoncoded string
     pubkey_hex = publicKey.encode(encoder=nacl.encoding.HexEncoder) 
     pubkey_hex_str = pubkey_hex.decode('utf-8')  
     
     #create HTTP BASIC authorization header
-    headers = http_funcs.getAuthenticationHeader()
+    headers = http_funcs.getAuthenticationHeader(cherrypy.session['username'], cherrypy.session['api_key'])
 
     payload = {
-        "connection_location" : "1",
+        "connection_location" : str(SERVER_LOCATION),
         "connection_address"  : str(SERVER_IP),
         "incoming_pubkey"     : pubkey_hex_str,
         "status"              : status
@@ -204,6 +212,7 @@ def addnewPubKey():
 
     pubkey_hex = publicKey.encode(encoder=nacl.encoding.HexEncoder) 
     pubkey_hex_str = pubkey_hex.decode('utf-8')  
+    private_key_hex_str = privateKey.encode(encoder=nacl.encoding.HexEncoder).decode('utf-8') 
     message_bytes = bytes(pubkey_hex_str + username, encoding='utf-8')  
     signed = privateKey.sign(message_bytes, encoder=nacl.encoding.HexEncoder) 
     signature_hex_str = signed.signature.decode('utf-8')
@@ -211,7 +220,7 @@ def addnewPubKey():
     addkey_url = "http://cs302.kiwi.land/api/add_pubkey"
 
     #create HTTP BASIC authorization header
-    headers = http_funcs.getAuthenticationHeader()
+    headers = http_funcs.getAuthenticationHeader(username, cherrypy.session['api_key'])
 
     payload = {
         "pubkey" : pubkey_hex_str,
@@ -223,24 +232,19 @@ def addnewPubKey():
 
     if ( data["loginserver_record"]):
         print("ADD PUBKEY SUCESS")
-        cherrypy.session['privateKey'] = privateKey
-        cherrypy.session['publicKey'] = publicKey
+        cherrypy.session['private_key'] = privateKey
+        cherrypy.session['public_key'] = publicKey
         cherrypy.session['loginserver_record'] = data['loginserver_record']
+        sql_funcs.add_user(cherrypy.session['username'], cherrypy.session['api_key'], pubkey_hex_str, private_key_hex_str   , cherrypy.session['loginserver_record'])
         return 0
     else:
         print("ADD PUBKEY FAIL")
-        return 1
+        return 1    
+    
 
+def send_broadcast(message):
 
-
-
-
-
-def send_broadcast(message, ip):
-    privateKey = cherrypy.session['privateKey']
-    publicKey = cherrypy.session['publicKey']
-
-    username = cherrypy.session['username']
+    privateKey = cherrypy.session['private_key']
     timestamp = time.time()
 
 
@@ -249,12 +253,9 @@ def send_broadcast(message, ip):
     signed = privateKey.sign(message_bytes, encoder=nacl.encoding.HexEncoder) 
     signature_hex_str = signed.signature.decode('utf-8')
 
-    broadcast_url = "http://" + ip + "/api/rx_broadcast"
-
-
-        
+       
     #create HTTP BASIC authorization header
-    headers = http_funcs.getAuthenticationHeader()
+    headers = http_funcs.getAuthenticationHeader(cherrypy.session['username'], cherrypy.session['api_key'])
 
     payload = {
         "loginserver_record" : cherrypy.session['loginserver_record'],
@@ -263,23 +264,26 @@ def send_broadcast(message, ip):
         "signature" : signature_hex_str
     }
 
+    #Send to own server so we can reload the page
+    broadcast_url = "http://" + LOCAL_IP + "/api/rx_broadcast"
+    http_funcs.sendJsonRequest(broadcast_url, payload, headers)
 
-    try:
-        data = http_funcs.sendJsonRequest(broadcast_url, payload, headers)
-    except:
-        return 1
-
-    if ( data["response"] == "ok"):
-        print("Succesfully broadcasted message")
-        return 0
-    else:
-        print("Failed broadcast")
-        return 1
-
+    userList = getUserList()
+    sql_funcs.updateUserList(userList)
+    myUsers = sql_funcs.get_all_users()
+    ips = [user['connection_address'] for user in userList]
+    ips = set(ips)
+    for ip in ips:
+        if(ip != SERVER_IP):
+            broadcast_url = "http://" + ip + "/api/rx_broadcast"
+            print("\nSending Broadcast to: " + ip)
+            send = Thread(target=http_funcs.sendJsonRequest, args=[broadcast_url, payload, headers])
+            send.start()    
+    return 0
 def getUserList():
     url = "http://cs302.kiwi.land/api/list_users"
 
-    headers = http_funcs.getAuthenticationHeader()
+    headers = http_funcs.getAuthenticationHeader(cherrypy.session['username'], cherrypy.session['api_key'])
     data = http_funcs.sendJsonRequest(url, None, headers)
     return data['users']
 
@@ -298,7 +302,7 @@ def displayBroadcasts():
 
         html += """ <div class="container">
 	                <p>"""
-        html +=  cgi.escape(message) 
+        html +=  markdown.markdown(message) 
         html +=  """</p>
 	                <span class="time-right">""" 
         html += cgi.escape(username) 

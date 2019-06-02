@@ -42,10 +42,10 @@ def runMainApp():
             'tools.encode.on': True, 
             'tools.encode.encoding': 'utf-8',
             'tools.sessions.on': True,
-            'tools.sessions.timeout': 60 * 1, #timeout is in minutes, * 60 to get hours
+            'tools.sessions.timeout':60* 1, #timeout is in minutes, * 60 to get hours
 
             # The default session backend is in RAM. Other options are 'file',
-            'tools.sessions.storage_type': 'file',
+            'tools.sessions.storage_class': cherrypy.lib.sessions.FileSession,
             'tools.sessions.storage_path': 'tmp/mysessions',
         },
 
@@ -81,7 +81,7 @@ def runMainApp():
     #cherrypy.tools.auth = cherrypy.Tool('before_handler', auth.check_auth, 99)
 
     print("Curtiss Rollinson Python Webserver")                 
-    cherrypy.engine.reporter = cherrypy.process.plugins.BackgroundTask(60, reporter.main)
+    cherrypy.engine.reporter = cherrypy.process.plugins.BackgroundTask(120, reporter.main)
     cherrypy.engine.reporter.start()
     # Start the web server
     cherrypy.engine.start()

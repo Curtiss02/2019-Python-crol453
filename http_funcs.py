@@ -16,35 +16,28 @@ def sendJsonRequest(url,payload, header):
 
     payload = bytes(payload, 'utf-8')
 
-    req = urllib.request.Request(url, data=payload, headers=header)
-    response = urllib.request.urlopen(req)
-    data = response.read() # read the received bytes
-    print(data)
 
-    encoding = response.info().get_content_charset('utf-8') #load encoding if possible (default to utf-8)
-    response.close()
 
-    
-    data = json.loads(data.decode(encoding))
+    try:
+        req = urllib.request.Request(url, data=payload, headers=header)
+        response = urllib.request.urlopen(req)
+        data = response.read() # read the received bytes
 
+        encoding = response.info().get_content_charset('utf-8') #load encoding if possible (default to utf-8)
+        response.close()
+        data = json.loads(data.decode(encoding))
+
+    except:
+        return 1
     return data
 
 
 
+def getAuthenticationHeader(username, api_key):
 
-def getAuthenticationHeader():
-
-    try:
-        username = cherrypy.session['username']
-        apikey = cherrypy.session['api_key']
-
-
-        headers = {
+    headers = {
         'X-username' : str(username),
-        'X-apikey' : str(apikey),
+        'X-apikey' : str(api_key),
         'Content-Type' : 'application/json; charset=utf-8'
         }
-        
-    except KeyError:
-        headers = -1
     return headers
