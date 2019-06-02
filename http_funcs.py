@@ -6,7 +6,7 @@ import base64
 import time
 import socket
 
-def sendJsonRequest(url,payload, header):
+def sendJsonRequest(url,payload = None, header = None):
     '''
         Sends a request to the specified URL with the given header(dict) and payload(dict).
         Returns the response in python dict format
@@ -26,8 +26,8 @@ def sendJsonRequest(url,payload, header):
         encoding = response.info().get_content_charset('utf-8') #load encoding if possible (default to utf-8)
         response.close()
         data = json.loads(data.decode(encoding))
-
-    except:
+    except Exception as ex:
+        print(ex)
         return 1
     return data
 

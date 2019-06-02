@@ -9,6 +9,7 @@ import sqlite3
 import sql_funcs
 import socket
 import time
+import binascii
 
 
 LOCAL_IP = socket.gethostbyname(socket.gethostname()) + ":8080"
@@ -94,9 +95,15 @@ class MainApp(object):
             
         except KeyError:
             result = {
-                "response" : "error"}
+                "response" : "error",
+                "message" : "missing field"}
             return json.dumps(result)
-
+        if(not(verifyBroadcastSignature(sender_record, msg, timestamp, sig))):
+            print("FAIL VERIFY")
+            result = {
+                "response" : "error",
+                "message" : "signature does not match"}
+            return json.dumps(result)
         print(sender_record, msg, timestamp, sig)
         sql_funcs.add_broadcast(sender_record, msg, timestamp, sig)
        
@@ -125,6 +132,27 @@ class MainApp(object):
         time =  str(time.time())
         result = {"response" : response, "message": message, "my_time": time}
         return json.dumps(result)
+
+def verifyLoginserverRecord(loginserver_record):
+    arr = loginserver_record.split(",")
+    username = arr[0]
+
+
+    return True
+
+def verifyBroadcastSignature(loginserver_record, message, timestamp, signature):
+    #Verifying throws excepton if the signature doesnt match
+    try:
+        pubkey = loginserver_record.split(',')[1]
+        message = message
+        verify_key = nacl.signing.VerifyKey(pubkey, encoder=nacl.encoding.HexEncoder)
+        sig_bytes = binascii.unhexlify(signature)
+        msg_bytes = bytes(loginserver_record + message + timestamp, 'utf-8')
+        verify_key.verify(msg_bytes, sig_bytes)
+        return True
+    except Exception as e:
+        print(e)
+        return False
 
 
         
