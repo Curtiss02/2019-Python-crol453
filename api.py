@@ -84,8 +84,10 @@ class MainApp(object):
     #allows incoming json data
     @cherrypy.tools.json_in()
     def rx_broadcast(self):
-
-        input_json = cherrypy.request.json
+        try:
+            input_json = cherrypy.request.json
+        except:
+            return json.dumps({"response" : "error", "message" : "invalid json"})
         
         try:
             sender_record = input_json['loginserver_record']
@@ -102,7 +104,7 @@ class MainApp(object):
             print("FAIL VERIFY")
             result = {
                 "response" : "error",
-                "message" : "signature does not match"}
+                "message" : "bad signature"}
             return json.dumps(result)
         print(sender_record, msg, timestamp, sig)
         sql_funcs.add_broadcast(sender_record, msg, timestamp, sig)
@@ -129,8 +131,8 @@ class MainApp(object):
             response = "error"
             message = "missing field"
                    
-        time =  str(time.time())
-        result = {"response" : response, "message": message, "my_time": time}
+        timestamp =  str(time.time())
+        result = {"response" : response, "message": message, "my_time": timestamp}
         return json.dumps(result)
 
 def verifyLoginserverRecord(loginserver_record):

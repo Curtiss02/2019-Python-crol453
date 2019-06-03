@@ -5,6 +5,7 @@ import json
 import base64
 import nacl.encoding
 import nacl.signing
+import nacl
 import time
 import socket
 import http_funcs
@@ -93,7 +94,7 @@ class MainApp(object):
         error = authLogin(username, password)
         #error = authoriseUserLogin(username, password)
         if error == 0: 
-            userinfo = sql_funcs.get_user(username)
+            userinfo = sql_funcs.get_client_user(username)
             print(userinfo)
             if(len(userinfo) != 0):
                 cherrypy.session['private_key'] = nacl.signing.SigningKey(userinfo[0][3], encoder=nacl.encoding.HexEncoder)
@@ -114,9 +115,10 @@ class MainApp(object):
         if username is None:
             pass
         else:
-            sql_funcs.remove_user(username)
+            sql_funcs.remove_client_user(username)
             cherrypy.lib.sessions.expire()
         raise cherrypy.HTTPRedirect('/')
+
     @cherrypy.expose
     def broadcast(self, message=None):
         if message != "":
@@ -126,8 +128,7 @@ class MainApp(object):
 
     @cherrypy.expose
     def users(self):
-        userList = getUserList()
-        sql_funcs.updateUserList(userList)
+        userList = sql_funcs.getUserList()
         Page = startHTML
         Page += html_strings.getNavbar(cherrypy.session['username'])
         Page += displayUserList(userList)
@@ -220,7 +221,7 @@ def addnewPubKey():
         cherrypy.session['private_key'] = privateKey
         cherrypy.session['public_key'] = publicKey
         cherrypy.session['loginserver_record'] = data['loginserver_record']
-        sql_funcs.add_user(cherrypy.session['username'], cherrypy.session['api_key'], pubkey_hex_str, private_key_hex_str   , cherrypy.session['loginserver_record'])
+        sql_funcs.add_client_user(cherrypy.session['username'], cherrypy.session['api_key'], pubkey_hex_str, private_key_hex_str   , cherrypy.session['loginserver_record'])
         return 0
     else:
         print("ADD PUBKEY FAIL")
@@ -253,10 +254,9 @@ def send_broadcast(message):
     broadcast_url = "http://" + LOCAL_IP + "/api/rx_broadcast"
     http_funcs.sendJsonRequest(broadcast_url, payload, headers)
 
-    userList = getUserList()
-    sql_funcs.updateUserList(userList)
-    myUsers = sql_funcs.get_all_users()
-    ips = [user['connection_address'] for user in userList]
+    userList = sql_funcs.getUserList()
+    
+    ips = [user[1] for user in userList]
     ips = set(ips)
     for ip in ips:
         if(ip != SERVER_IP):
@@ -313,24 +313,27 @@ def displayUserList(userList):
     <th scope="col">Public Key</th>
     <th scope="col">Last Seen</th>
     <th scope="col">Status</th>
+    <th scope="col">Reachable</th>
     </tr>
     </thead>
     <tbody>"""
 
     for user in userList:
         html += "<tr>"
-        username = cgi.escape((user['username']))
-        timeSinceActivity =  cgi.escape(str(round((time.time() - float(user['connection_updated_at']))/60)) + "minutes ago")
-        connection_address = cgi.escape(user['connection_address'])
-        connection_location = cgi.escape(str(user['connection_location']))
-        pubkey = cgi.escape(user['incoming_pubkey'])
-        status = cgi.escape(user['status'])
+        username = cgi.escape((user[0]))
+        timeSinceActivity =  cgi.escape(str(round((time.time() - float(user[5]))/60)) + "minutes ago")
+        connection_address = cgi.escape(user[1])
+        connection_location = cgi.escape(str(user[2]))
+        pubkey = cgi.escape(user[3])
+        status = cgi.escape(user[4])
+        reachable = cgi.escape(user[6])
         html += "<th scope=\"row\">" + username + "</th>"
         html += "<td>" + connection_address + "</td>"
         html += "<td>" + connection_location + "</td>"
         html += "<td>" + pubkey + "</td>"
         html += "<td>" + timeSinceActivity + "</td>"
         html += "<td>" + status + "</td>"
+        html += "<td>" + reachable + "</td>"
         html += "</tr>"
     return html
 
@@ -340,3 +343,10 @@ def encodeKey(key):
     key_hex = key.encode(encoder=nacl.encoding.HexEncoder) 
     key_hex_str = key_hex.decode('utf-8')  
     return key_hex_str
+
+def send_private_message(username):
+    #Sends a private message to a user of given username
+    userinfo = sql_funcs.getUserFromUserList(username)
+
+
+    return 1

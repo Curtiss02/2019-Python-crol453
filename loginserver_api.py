@@ -40,7 +40,7 @@ def ping(pubkey = None, signature = None, authenticationHeader = None):
         data = http_funcs.sendJsonRequest(ping_url, payload=payload, header=authenticationHeader)
     except Exception as e:
         print(e)
-        return 1
+        return "FAIL"
     return data
 
 def load_new_apikey(authenticationHeader):
