@@ -35,8 +35,9 @@ jumbotron_login = """<div class="jumbotron text-center" style="background-color:
                     <h1>Welcome to Chatter!</h1>
                     <p>Login to join the social media sensation!</p> 
                     </div>"""
-login_form = """<form action="/signin" method="post" enctype="multipart/form-data">
-                <div class="form-group">
+login_form = """<div class="row"><div class="col-sm-9 col-md-7 col-lg-5 mx-auto">
+                    <form action="/signin" method="post" enctype="multipart/form-data">
+                <div class="form-group ">
                     <label for="inputUsername">Username</label>
                     <input type="text" name="username" class="form-control" id="inputUsername" aria-describedby="usernameHelp" placeholder="Enter username">
                     <small id="usernameHelp" class="form-text text-muted">Username is your UPI.</small>
@@ -51,4 +52,4 @@ login_form = """<form action="/signin" method="post" enctype="multipart/form-dat
                 </div>
                 <button type="submit" class="btn btn-primary">Submit</button>
                 </form>
-                </div></div>"""
+                </div></div></div></div>"""

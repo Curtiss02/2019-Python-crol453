@@ -61,10 +61,10 @@ class MainApp(object):
                 
             Page += html_strings.jumbotron
             #Page += "<div class=\"d-flex justify-content-center\">"
-            Page += "<div class=\"mx-auto\">"
+            Page += "<div class=\"mx-auto\" style=\"width: 100%;padding-right: 10%; padding-left: 10%;margin-right: 15px; margin-left: 15px;\">"
             Page += '<form action="/broadcast" method="post" enctype="multipart/form-data">'
             Page += """<div class="form-group">
-                    <label for="message">Message:</label>
+                    <label for="message"><strong>Message:</strong></label>
                     <textarea class="form-control" class="rounded" rows="5" id="message" name="message"></textarea>
                     </div>"""
             Page += '<input type="submit" value="Send Broadcast"/></form>'
@@ -77,8 +77,7 @@ class MainApp(object):
     def login(self, bad_attempt = 0):
         Page = startHTML 
         Page += html_strings.jumbotron_login
-        Page += """ <div class="container">
-                    <div class=".col-sm-">
+        Page += """<div class=".col-sm-">
                     
                     """
         if bad_attempt != 0:

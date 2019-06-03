@@ -31,7 +31,12 @@ def markdown(text):
         oldstring = match[0] + string + match[0]
         newstring = "<em>" + string + "</em>"
         text = text.replace(oldstring, newstring)
-
+    #Deletiions
+    deletion_matches = re.findall("\~\~(.*?)\~\~", text)
+    for match in deletion_matches:
+        oldstring = "~~" + match + "~~"
+        newstring = "<del>" + match + "</del>"
+        text = text.replace(oldstring, newstring)
     #Code
     code_matches = re.findall('`(.*?)`', text)
     for code in code_matches:
@@ -44,7 +49,7 @@ def markdown(text):
         description = i[0]
         url = i[1]
         oldstring = "![" + description + "](" + url + ")"
-        newstring = "<img src=\"" + url + "\" alt=\"" + description + "\">"
+        newstring = "<img src=\"" + url + "\" alt=\"" + description + "\" style=\"max-width:100%;\">"
         text = text.replace(oldstring, newstring)
     #Regular Inline Links
     links = re.findall("(?:\[(.*?)\]\((.*?)\))", text)
