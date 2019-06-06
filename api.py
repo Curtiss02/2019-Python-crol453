@@ -4,12 +4,14 @@ import json
 import base64
 import nacl.encoding
 import nacl.signing
+import nacl
 import time
 import sqlite3
 import sql_funcs
 import socket
 import time
 import binascii
+import loginserver_api
 
 
 LOCAL_IP = socket.gethostbyname(socket.gethostname()) + ":8080"
@@ -100,6 +102,7 @@ class MainApp(object):
                 "response" : "error",
                 "message" : "missing field"}
             return json.dumps(result)
+        verifyLoginserverRecord(sender_record)
         if(not(verifyBroadcastSignature(sender_record, msg, timestamp, sig))):
             print("FAIL VERIFY")
             result = {
@@ -135,12 +138,50 @@ class MainApp(object):
         result = {"response" : response, "message": message, "my_time": timestamp}
         return json.dumps(result)
 
+    @cherrypy.expose
+    #allows incoming json data
+    @cherrypy.tools.json_in()    
+    def rx_privatemessage(self):
+        try:
+            input_json = cherrypy.request.json
+        except:
+            return json.dumps({"response" : "error", "message" : "invalid json"})
+        try:
+            loginserver_record = input_json['loginserver_record']
+            target_pubkey = input_json['target_pubkey']
+            target_username = input_json['target_username']
+            encrypted_message = input_json['encrypted_message']
+            timestamp = input_json['sender_created_at']
+            signature = input_json['signature']
+        except KeyError:
+            return json.dumps({"response" : "error", "message" : "missing field"})
+
+        sql_funcs.addPrivateMessage(loginserver_record, target_pubkey, target_username, encrypted_message, timestamp, signature)
+        return json.dumps({"response" : "ok"})
+        
+
 def verifyLoginserverRecord(loginserver_record):
-    arr = loginserver_record.split(",")
-    username = arr[0]
 
+    try:
+        arr = loginserver_record.split(",")
+        username = arr[0]
+        pubkey = arr[1]
+        timestamp = arr[2]
+        sig = arr[3]
+        server_pubkey = loginserver_api.loginserver_pubkey()['pubkey']
+        server_pubkey = nacl.signing.VerifyKey(server_pubkey, encoder=nacl.encoding.HexEncoder)
+        verify_key = server_pubkey
+        sig_bytes = binascii.unhexlify(sig)
+        msg_bytes = bytes(username + pubkey + timestamp, 'utf-8')
+        print(msg_bytes)
 
-    return True
+        verify_key.verify(msg_bytes, sig_bytes)
+
+        return True
+    except Exception as e:
+        print(e)
+        return False
+
 
 def verifyBroadcastSignature(loginserver_record, message, timestamp, signature):
     #Verifying throws excepton if the signature doesnt match
@@ -155,6 +196,8 @@ def verifyBroadcastSignature(loginserver_record, message, timestamp, signature):
     except Exception as e:
         print(e)
         return False
+def verifyPrivateMessage():
+    return 1
 
 
         

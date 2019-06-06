@@ -93,16 +93,9 @@ class MainApp(object):
         error = authLogin(username, password)
         #error = authoriseUserLogin(username, password)
         if error == 0: 
-            userinfo = sql_funcs.get_client_user(username)
-            print(userinfo)
-            if(len(userinfo) != 0):
-                cherrypy.session['private_key'] = nacl.signing.SigningKey(userinfo[0][3], encoder=nacl.encoding.HexEncoder)
-                print(cherrypy.session['private_key'])
-                cherrypy.session['public_key'] = cherrypy.session['private_key'].verify_key
-                cherrypy.session['loginserver_record'] = userinfo[0][4] 
-            else:
-                addnewPubKey()
+            addnewPubKey()
             loginReport()
+            
             raise cherrypy.HTTPRedirect('/')
         else:
             raise cherrypy.HTTPRedirect('/login?bad_attempt=1')
@@ -117,7 +110,6 @@ class MainApp(object):
             sql_funcs.remove_client_user(username)
             cherrypy.lib.sessions.expire()
         raise cherrypy.HTTPRedirect('/')
-
     @cherrypy.expose
     def broadcast(self, message=None):
         if message != "":
@@ -127,13 +119,32 @@ class MainApp(object):
 
     @cherrypy.expose
     def users(self):
-        userList = sql_funcs.getUserList()
-        Page = startHTML
-        Page += html_strings.getNavbar(cherrypy.session['username'])
-        Page += displayUserList(userList)
+        if(cherrypy.session.get('username') == None):
+            raise cherrypy.HTTPRedirect('/login')
+        else:
+            userList = sql_funcs.getUserList()
+            Page = startHTML
+            Page += html_strings.getNavbar(cherrypy.session['username'])
+            Page += displayUserList(userList)
 
-        return Page
+            return Page
 
+    @cherrypy.expose
+    def priv(self):
+        send_private_message("crol453", "hello")
+
+    @cherrypy.expose
+    def private(self):
+        if(cherrypy.session.get('username') == None):
+            raise cherrypy.HTTPRedirect('/login')
+        else:
+            Page = startHTML
+            Page += html_strings.getNavbar(cherrypy.session['username'])
+            Page +=  displayPrivateMessages()
+            Page += html_strings.pills
+            Page += endHTML
+            
+            return Page
     
 
         
@@ -221,6 +232,7 @@ def addnewPubKey():
         cherrypy.session['public_key'] = publicKey
         cherrypy.session['loginserver_record'] = data['loginserver_record']
         sql_funcs.add_client_user(cherrypy.session['username'], cherrypy.session['api_key'], pubkey_hex_str, private_key_hex_str   , cherrypy.session['loginserver_record'])
+        sql_funcs.addKeyPair(cherrypy.session['username'], pubkey_hex_str, private_key_hex_str)
         return 0
     else:
         print("ADD PUBKEY FAIL")
@@ -289,7 +301,7 @@ def displayBroadcasts():
         
         readable_timestamp = time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime(int_timestamp))
 
-        html += """ <div class="container">
+        html += """ <div class="broadcast_container container">
 	                <p>"""
         html +=  markdown.markdown(message) 
         html +=  """</p>
@@ -343,9 +355,141 @@ def encodeKey(key):
     key_hex_str = key_hex.decode('utf-8')  
     return key_hex_str
 
-def send_private_message(username):
+def send_private_message(username, message):
     #Sends a private message to a user of given username
-    userinfo = sql_funcs.getUserFromUserList(username)
+    userinfo = sql_funcs.getUserFromUserList(username)[0]
+    #Grab pubkey of reciever
+    signing_key = cherrypy.session['private_key']
+    print(userinfo)
+    receiving_pubkey = nacl.signing.VerifyKey(userinfo[3], encoder=nacl.encoding.HexEncoder)
+    receiving_pubkey = receiving_pubkey.to_curve25519_public_key()
+    box = nacl.public.SealedBox(receiving_pubkey)
+
+
+    
+
+    encrypted = box.encrypt(bytes(message, 'utf-8'), encoder=nacl.encoding.HexEncoder)
+    enc_message = encrypted.decode('utf-8')
+
+    loginserver_record= cherrypy.session['loginserver_record']
+    address = userinfo[1]
+    url = ''
+    if(address == SERVER_IP):
+       url =  "http://localhost:8080/api/rx_privatemessage"
+    else:
+        url = "http://" + address + "/api/rx_privatemessage"
+    target_pubkey = userinfo[3]
+    timestamp = str(time.time())
+
+    sig_msg = loginserver_record + target_pubkey + username + enc_message + timestamp
+    sig_bytes = bytes(sig_msg, encoding='utf-8')  
+    sig_hex = signing_key.sign(sig_bytes, encoder=nacl.encoding.HexEncoder) 
+    signature_hex_str = sig_hex.signature.decode('utf-8')
+
+    payload = {
+        "loginserver_record" : loginserver_record,
+        "target_pubkey" : target_pubkey,
+        "target_username" : username,
+        "encrypted_message" : enc_message,
+        "sender_created_at" : timestamp,
+        "signature" : signature_hex_str
+    }
+    header = http_funcs.getAuthenticationHeader(cherrypy.session['username'], cherrypy.session['api_key'])
+    data = http_funcs.sendJsonRequest(url, payload=payload, header=header)
+    sql_funcs.addLocalPrivateMessage(cherrypy.session['username'], username, message, timestamp)
+    print("Message SENT")
+    print(data)
 
 
     return 1
+
+def displayPrivateMessages():
+    username = cherrypy.session['username']
+    message_rows = sql_funcs.getMessagesToUser(username)
+    html = "<div class=\"container\"><div class=\"row\">"
+    html += """ <div class="nav flex-column nav-pills" id="v-pills-tab" role="tablist" aria-orientation="vertical"> """
+    messageList = getConversations(username)
+    print(messageList)
+    conversationUsers = [msg['receiver'] for msg in messageList]
+    conversationUsers = conversationUsers + [msg['sender'] for msg in messageList]
+    conversationUsers = set(conversationUsers)
+    for user in conversationUsers:
+        html += """<a class="nav-link" id="v-pills-""" + user + """-tab" data-toggle="pill" href="#v-pills-""" + user + """" role="tab" aria-controls="v-pills-""" + user + """" aria-selected="false">""" + user + """</a>"""   
+    html += """</div>"""
+    html += """<div class="tab-content" id="v-pills-tabContent">"""
+    for user in conversationUsers:
+        html += """ <div class="tab-pane fade" id="v-pills-""" + user +"""" role="tabpanel" aria-labelledby="v-pills-""" + user + """-tab">"""
+        for msg in messageList:
+            if(msg['receiver'] == user):
+                html += """ <div class="broadcast_container container">
+	                <p>"""
+                html +=  markdown.markdown(msg['message']) 
+                html +=  """</p>
+	                <span class="time-right">""" 
+                html += msg['sender']
+                html += ": " 
+                html += str(msg['timestamp'])
+                html += """</span>
+        	            </div> """
+            elif (msg['sender'] == user):
+                html += """ <div class="broadcast_container container darker">
+	                <p>"""
+                html +=  markdown.markdown(msg['message']) 
+                html +=  """</p>
+	                <span class="time-right">""" 
+                html += msg['sender']
+                html += ": " 
+                html += str(msg['timestamp'])
+                html += """</span>
+        	            </div> """
+        html += """</div>"""
+
+    html += """</div>
+                </div>
+                </div>"""    
+    print(conversationUsers)
+    return html
+
+def decryptPrivateMessage(message_string, privatekey_hex_str):
+    try:
+        privkey = nacl.signing.SigningKey(privatekey_hex_str, encoder=nacl.encoding.HexEncoder)
+        privkey = privkey.to_curve25519_private_key()
+        msg = bytes(message_string, 'utf-8')
+        unseal = nacl.public.SealedBox(privkey)
+        msg = unseal.decrypt(msg, encoder=nacl.encoding.HexEncoder)
+        msg = msg.decode('utf-8')
+        return msg
+    except Exception as e:
+        print(e)
+        return False
+
+
+
+#Returns a list of dicts containing messages ordered by timestamp
+def getConversations(username):
+    localmessages = sql_funcs.getLocalPrivateMessagesConversation(username)
+    externalmessages = sql_funcs.getMessagesToUser(username)
+    messageList = []
+    for message in localmessages:
+        content = {
+            "sender" : message[0],
+            "receiver" : message[1],
+            "message" : message[2],
+            "timestamp" : message[3]
+        }
+        messageList.append(content)
+    for message in externalmessages:
+        enc_message = message[3]
+        target_pubkey = message[1]
+        keypairs = sql_funcs.getKeyPairsforUser(username)
+        msg= "test"
+        content = {
+            "sender" : message[0].split(",")[0],
+            "receiver" : message[2],
+            "message" : msg,
+            "timestamp" : message[4]
+        }
+        messageList.append(content)
+    messageList = sorted(messageList, key=lambda k: k['timestamp'])
+  
+    return messageList

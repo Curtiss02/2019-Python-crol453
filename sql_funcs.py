@@ -106,7 +106,7 @@ def getUserFromUserList(username):
     conn = sqlite3.connect(db)
     sql = "SELECT * FROM userlist WHERE Username = ?"
     cur = conn.cursor()
-    cur.execute(sql, username)
+    cur.execute(sql, [username])
     rows = cur.fetchall()
     conn.commit()
     return rows
@@ -116,6 +116,57 @@ def get_broadcasts():
     sql = "SELECT * FROM broadcasts ORDER BY timestamp DESC"
     cur = conn.cursor()
     cur.execute(sql)
+    rows = cur.fetchall()
+    conn.commit()
+    return rows
+def addKeyPair(username,publicKey, privateKey):
+    data = (username, privateKey, publicKey)
+    conn = sqlite3.connect(db)
+    sql = ''' INSERT INTO keys(username, publickey, privatekey)
+              VALUES(?,?,?) '''
+    cur = conn.cursor()
+    cur.execute(sql, data)
+    conn.commit()
+def addPrivateMessage(loginserver_record, target_pubkey, target_username, encrypted_message, timestamp, signature):
+    data = (loginserver_record, target_pubkey, target_username, encrypted_message, timestamp, signature)
+    conn = sqlite3.connect(db)
+    sql = ''' INSERT INTO privatemessages(loginserver_record, target_pubkey, target_username, encrypted_message, timestamp, signature)
+              VALUES(?,?,?,?,?,?) '''
+    cur = conn.cursor()
+    cur.execute(sql, data)
+    conn.commit()
+def getKeyPairsforUser(username):
+    data = [username]
+    conn = sqlite3.connect(db)
+    sql = '''SELECT publickey, privatekey FROM keys WHERE username = ?'''
+    cur = conn.cursor()
+    cur.execute(sql, data)
+    rows = cur.fetchall()
+    conn.commit()
+    return rows
+def getMessagesToUser(username):
+    data = [username]
+    conn = sqlite3.connect(db)
+    sql = '''SELECT * FROM privatemessages WHERE target_username = ?'''
+    cur = conn.cursor()
+    cur.execute(sql, data)
+    rows = cur.fetchall()
+    conn.commit()
+    return rows
+def addLocalPrivateMessage(sender, receiver, message, timestamp):
+    data = (sender, receiver, message, timestamp)
+    conn = sqlite3.connect(db)
+    sql = ''' INSERT INTO localprivatemessages(sender, receiver, message, timestamp)
+              VALUES(?,?,?,?) '''
+    cur = conn.cursor()
+    cur.execute(sql, data)
+    conn.commit()
+def getLocalPrivateMessagesfromUser(sender):
+    data = [sender]
+    conn = sqlite3.connect(db)
+    sql = ''' SELECT * FROM localprivatemessages WHERE sender=?'''
+    cur = conn.cursor()
+    cur.execute(sql, data)
     rows = cur.fetchall()
     conn.commit()
     return rows

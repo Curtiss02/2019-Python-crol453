@@ -16,7 +16,7 @@ def getNavbar(username):
             <a class="nav-link" href="/users">User Lists</a>
         </li>
         <li class="nav-item">
-            <a class="nav-link" href="#">Private Messages</a>
+            <a class="nav-link" href="/private">Private Messages</a>
         </li>
         </ul>
         <span class="navbar-text">""" + username + """</span>
@@ -53,3 +53,18 @@ login_form = """<div class="row"><div class="col-sm-9 col-md-7 col-lg-5 mx-auto"
                 <button type="submit" class="btn btn-primary">Submit</button>
                 </form>
                 </div></div></div></div>"""
+pills = """<div class=\"container\"><div class=\"row\">
+<div class="nav flex-column nav-pills" id="v-pills-tab" role="tablist" aria-orientation="vertical">
+  <a class="nav-link active" id="v-pills-home-tab" data-toggle="pill" href="#v-pills-home" role="tab" aria-controls="v-pills-home" aria-selected="true">User1</a>
+  <a class="nav-link" id="v-pills-profile-tab" data-toggle="pill" href="#v-pills-profile" role="tab" aria-controls="v-pills-profile" aria-selected="false">User2</a>
+  <a class="nav-link" id="v-pills-messages-tab" data-toggle="pill" href="#v-pills-messages" role="tab" aria-controls="v-pills-messages" aria-selected="false">user3</a>
+  <a class="nav-link" id="v-pills-settings-tab" data-toggle="pill" href="#v-pills-settings" role="tab" aria-controls="v-pills-settings" aria-selected="false">User4</a>
+</div>
+<div class="tab-content" id="v-pills-tabContent">
+  <div class="tab-pane fade show active" id="v-pills-home" role="tabpanel" aria-labelledby="v-pills-home-tab">a</div>
+  <div class="tab-pane fade" id="v-pills-profile" role="tabpanel" aria-labelledby="v-pills-profile-tab">b</div>
+  <div class="tab-pane fade" id="v-pills-messages" role="tabpanel" aria-labelledby="v-pills-messages-tab">c</div>
+  <div class="tab-pane fade" id="v-pills-settings" role="tabpanel" aria-labelledby="v-pills-settings-tab">d</div>
+</div>
+</div>
+</div>"""
