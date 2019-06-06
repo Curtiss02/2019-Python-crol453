@@ -467,7 +467,7 @@ def decryptPrivateMessage(message_string, privatekey_hex_str):
 
 #Returns a list of dicts containing messages ordered by timestamp
 def getConversations(username):
-    localmessages = sql_funcs.getLocalPrivateMessagesConversation(username)
+    localmessages = sql_funcs.getLocalPrivateMessagesfromUser(username)
     externalmessages = sql_funcs.getMessagesToUser(username)
     messageList = []
     for message in localmessages:
