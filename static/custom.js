@@ -10,19 +10,28 @@ $('#messagemodal').on('show.bs.modal', function (event) {
 
 function searchBroadcasts() {
 
-  var input, filter, p, i, txtValue, containers;
-  input = document.getElementById('search_msg');
-  filter = input.value.toUpperCase();
+  var input1, input2, filter_msg, filter_upi, p, i, txtValue,txtValue2,  containers, s;
+  input1 = document.getElementById('search_msg');
+  input2 = document.getElementById('search_user');
+  filter_upi = input2.value.toUpperCase();
+  filter_msg = input1.value.toUpperCase();
   containers = document.getElementsByClassName("broadcast_container")
 
   // Loop through all list items, and hide those who don't match the search query
   for (i = 0; i < containers.length; i++) {
     p = containers[i].getElementsByTagName("p")[0];
     txtValue = p.textContent || p.innerText;
-    if (txtValue.toUpperCase().indexOf(filter) > -1) {
+
+    s = containers[i].getElementsByTagName("span")[0];
+    txtValue2 = s.textContent || s.innerText;
+    txtValue2 = txtValue2.split(":")[0];
+
+    if ((txtValue.toUpperCase().indexOf(filter_msg) > -1) && (txtValue2.toUpperCase().indexOf(filter_upi) > -1)) {
       containers[i].style.display = "";
     } else {
       containers[i].style.display = "none";
     }
   }
 }
+
+

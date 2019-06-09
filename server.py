@@ -19,7 +19,7 @@ import loginserver_api
 
 SERVER_IP = ''
 LOCATION = ''
-LOCAL_IP = "localhost:8080"
+LOCAL_IP = "localhost:10000"
 with open('cfg/ip.ini') as json_file:
     ip_data = json.load(json_file)
     SERVER_IP = ip_data['SERVER_IP']
@@ -54,7 +54,6 @@ class MainApp(object):
     # PAGES (which return HTML that can be viewed in browser)
     @cherrypy.expose
     def index(self):
-        cherrypy.session['username'] = "crol453"
         
         if(cherrypy.session.get('username') == None):
             raise cherrypy.HTTPRedirect('/login')
@@ -336,6 +335,7 @@ def send_broadcast(message):
     
     ips = [user[1] for user in userList]
     ips = set(ips)
+    print(ips)
     for ip in ips:
         if(ip != SERVER_IP):
             broadcast_url = "http://" + ip + "/api/rx_broadcast"
@@ -360,15 +360,35 @@ def displayBroadcasts():
     hiddenCounter = 0
     filter_strings = sql_funcs.getFilterWordForUser(cherrypy.session['username'])
     filter_strings = [word[0] for word in filter_strings]
+    msg = []
+
+    #Get favourited broadcast meta messages
+    meta_messages = [row[1] for row in broadcasts if row[1].lower().startswith('!meta:favourite_broadcast')]
+    sigs = [msg.split(":")[2] for msg in meta_messages]
+    fav_sigs = []
+    #To account for people sending the signature in the form ["sig"] or just "sig"
+    for sig in sigs:
+        if sig.startswith("["):
+            fav_sigs.append(sig[1:-1])
+        else:
+            fav_sigs.append(sig)
     
-    html += """<div><label for="search_msg" class="col-form-label">Search:</label>
-            <input type="text" onkeyup="searchBroadcasts()" placeholder="Search messages..." class="form-control" id="search_msg"></div>"""
+    html += """<div class="container"><div class="row"><div class='col-sm col'><label for="search_msg" class="col-form-label">Search Messages:</label>
+            <input type="text" onkeyup="searchBroadcasts()" placeholder="Search messages..." class="form-control" id="search_msg"></div>
+            <div class="col-sm"><label for="search_user" class="col-form-label">Search Users:</label>
+            <input type="text" onkeyup="searchBroadcasts()" placeholder="Search for messages from user..." class="form-control" id="search_user"></div></div></div> """
     html += "<div class=\"d-flex justify-content-center\"><h1>Public Broadcasts</h1></div>"
 
     for row in broadcasts:
+        
         message = row[1]
+        signature = row[3]
         if any(string.lower() in message.lower() for string in filter_strings):
             continue
+        if (message.lower().startswith("!meta")):
+            continue
+        fav_count = fav_sigs.count(signature)
+        fav_string = "!Meta:favourite_broadcast:" + signature
         username = row[0].split(',')[0]
         timestamp = row[2]
         int_timestamp = int(float(timestamp))
@@ -378,12 +398,14 @@ def displayBroadcasts():
         html += """ <div class="broadcast_container container">
 	                <p>"""
         html +=  markdown.markdown(message) 
-        html +=  """</p>
-	                <span class="time-right">""" 
+        html +=  "</p>"        
+        html +=  """  <span class="time-right">""" 
         html += cgi.escape(username) 
         html += ": " 
         html += readable_timestamp 
-        html += """</span>
+        html += """</span><span class="time-left"><form action="/broadcast" method="post" enctype="multipart/form-data">
+                    <button type='submit' class='btn' name='message' value='""" + fav_string + """'>❤ """ +  str(fav_count) + """</button>
+                    </form>""" + """</span>
         	     </div> """
                 
     return html
@@ -407,7 +429,7 @@ def displayUserList(userList):
         html += "<td>" + pubkey + "</td>"
         html += "<td>" + timeSinceActivity + "</td>"
         html += "<td>" + status + "</td>"
-        html += "<td>" + reachable + "</td>"
+        html += "<td><img src='static/img/" + reachable + ".gif' alt='" + reachable + "' width='32' height='32'></td>"
         html += "</tr>"
     
     html += html_strings.messagemodal
@@ -426,9 +448,9 @@ def send_private_message(username, message):
         userinfo = sql_funcs.getUserFromUserList(username)[0]
     except:
         print("user not found")
+        return
     #Grab pubkey of reciever
     signing_key = cherrypy.session['private_key']
-    print(userinfo)
     receiving_pubkey = nacl.signing.VerifyKey(userinfo[3], encoder=nacl.encoding.HexEncoder)
     receiving_pubkey = receiving_pubkey.to_curve25519_public_key()
     box = nacl.public.SealedBox(receiving_pubkey)
@@ -443,7 +465,7 @@ def send_private_message(username, message):
     address = userinfo[1]
     url = ''
     if(address == SERVER_IP):
-       url =  "http://localhost:8080/api/rx_privatemessage"
+       url =  "http://localhost:10000/api/rx_privatemessage"
     else:
         url = "http://" + address + "/api/rx_privatemessage"
     target_pubkey = userinfo[3]
@@ -464,6 +486,9 @@ def send_private_message(username, message):
     }
     header = http_funcs.getAuthenticationHeader(cherrypy.session['username'], cherrypy.session['api_key'])
     data = http_funcs.sendJsonRequest(url, payload=payload, header=header)
+    #Send to my own server in case offline
+    send_away = Thread(target=http_funcs.sendJsonRequest, args=["http://localhost:10000/api/rx_privatemessage", payload, header])
+    send_away.start()
     sql_funcs.addLocalPrivateMessage(cherrypy.session['username'], username, message, timestamp)
     print("Message SENT")
     print(data)
@@ -477,7 +502,6 @@ def displayPrivateMessages():
     html = "<div class=\"container\"><div class=\"row\">"
     html += """ <div class="nav flex-column nav-pills" id="v-pills-tab" role="tablist" aria-orientation="vertical"> """
     messageList = getConversations(username)
-    print(messageList)
     conversationUsers = [msg['receiver'] for msg in messageList]
     conversationUsers = conversationUsers + [msg['sender'] for msg in messageList]
     conversationUsers = set(conversationUsers)
@@ -546,7 +570,6 @@ def displayPrivateMessages():
     html += """</div>
                 </div>
                 </div>"""    
-    print(conversationUsers)
     return html
 
 def decryptString(message_string, privatekey_hex_str):

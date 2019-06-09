@@ -58,9 +58,9 @@ def updateUserList(userList):
     try:
         conn = sqlite3.connect(db)
         cur = conn.cursor()
-        sql = "DELETE FROM userlist"
-        cur.execute(sql)
-        conn.commit()
+        #sql = "DELETE FROM userlist"
+        #cur.execute(sql)
+        #conn.commit()
         for user in userList:
 
             username = user['username']
@@ -71,7 +71,6 @@ def updateUserList(userList):
             status = user['status']
 
             data = (username, connection_address, connection_location, pubkey, status, lastActive)
-            
             sql = ''' INSERT INTO userlist (Username, connection_address, connection_location, publickey, status, lastseen)
                 VALUES(?,?,?,?,?,?) '''
             cur.execute(sql, data)
@@ -95,7 +94,7 @@ def updateUserReachable(username, reachable):
         
 def getUserList():
     conn = sqlite3.connect(db)
-    sql = "SELECT * FROM userlist"
+    sql = "SELECT * FROM userlist ORDER BY username"
     cur = conn.cursor()
     cur.execute(sql)
     rows = cur.fetchall()
@@ -215,3 +214,11 @@ def add2FAHAsh(username, pwhash):
     cur = conn.cursor()
     cur.execute(sql, data)
     conn.commit()
+def getAllPrivateMessages():
+    conn = sqlite3.connect(db)
+    sql = '''SELECT * FROM privatemessages'''
+    cur = conn.cursor()
+    cur.execute(sql)
+    rows = cur.fetchall()
+    conn.commit()
+    return rows

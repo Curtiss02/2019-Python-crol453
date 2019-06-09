@@ -32,7 +32,7 @@ from sqlite3 import Error
 #Grabs the primary local IP for the system in order to host the server
 
 LISTEN_IP = "0.0.0.0"
-LISTEN_PORT = 8080
+LISTEN_PORT = 10000
 
 def runMainApp():
     #set up the config

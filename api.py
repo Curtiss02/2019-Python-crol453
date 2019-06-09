@@ -29,42 +29,16 @@ class MainApp(object):
     @cherrypy.expose
     @cherrypy.tools.json_in()
     def default(self, *args, **kwargs):
+        if(rateLimit()):
+            return json.dumps({"response" : "error", "message" : "rate limit"})
         return "<html><body>404</body></html>"
-
-    @cherrypy.expose
-    def test(self):
-
-        url = "http://" + LOCAL_IP + "/api/rx_broadcast"
-        timestamp = str(time.time())
-        payload = {
-            "loginserver_record" : "adkjaskldjasldjajklsd1231",
-            "message" : "TEST API 123",
-            "sender_created_at" : timestamp,
-            "signature" : "hey feller"
-        }
-        headers = {
-            'Content-Type' : 'application/json; charset=utf-8',
-        }   
-
-        payload = json.dumps(payload)
-        payload = bytes(payload, 'utf-8')
-        req = urllib.request.Request(url, data=payload, headers=headers)
-
-        response = urllib.request.urlopen(req)
-
-        data = response.read() # read the received bytes
-        encoding = response.info().get_content_charset('utf-8') #load encoding if possible (default to utf-8)
-        response.close()
-
-        data = json.loads(data.decode(encoding))
-
-
-
 
 
     @cherrypy.expose
     @cherrypy.tools.json_in()
     def rx_message(self):
+        if(rateLimit()):
+            return json.dumps({"response" : "error", "message" : "rate limit"})
         input_json = cherrypy.request.json
         
         msg = input_json['message']
@@ -78,6 +52,8 @@ class MainApp(object):
     #allows incoming json data
     @cherrypy.tools.json_in()
     def rx_broadcast(self):
+        if(rateLimit()):
+            return json.dumps({"response" : "error", "message" : "rate limit"})
         try:
             input_json = cherrypy.request.json
         except:
@@ -114,6 +90,8 @@ class MainApp(object):
     #allows incoming json data
     @cherrypy.tools.json_in()
     def ping_check(self):
+        if(rateLimit()):
+            return json.dumps({"response" : "error", "message" : "rate limit"})
         try:
             input_json = cherrypy.request.json
         except:
@@ -136,6 +114,8 @@ class MainApp(object):
     #allows incoming json data
     @cherrypy.tools.json_in()    
     def rx_privatemessage(self):
+        if(rateLimit()):
+            return json.dumps({"response" : "error", "message" : "rate limit"})
         try:
             input_json = cherrypy.request.json
         except:
@@ -152,7 +132,50 @@ class MainApp(object):
 
         sql_funcs.addPrivateMessage(loginserver_record, target_pubkey, target_username, encrypted_message, timestamp, signature)
         return json.dumps({"response" : "ok"})
-        
+    @cherrypy.expose
+    @cherrypy.tools.json_in()
+    def checkmessages(self):
+        if(rateLimit()):
+            return json.dumps({"response" : "error", "message" : "rate limit"})
+        try:
+            input_json = cherrypy.request.json
+        except:
+            return json.dumps({"response" : "error", "message" : "invalid json"})
+        try:
+            since = float(input_json['since'])
+        except:
+            return json.dumps({"response" : "error", "message" : "missing time"})
+        broadcast_rows = sql_funcs.get_broadcasts()
+        broadcasts_since = []
+        for broadcast in broadcast_rows:
+            timestamp = float(broadcast[2])
+            if(timestamp > since):
+                broadcast_dict = {
+                    "loginserver_record" : broadcast[0],
+                    "message" : broadcast[1],
+                    "sender_created_at" : broadcast[2],
+                    "signature" : broadcast[3]
+                }
+                broadcasts_since.append(broadcast_dict)
+        message_rows = sql_funcs.getAllPrivateMessages()
+        messages_since = []
+        for message in message_rows:
+            timestamp = float(message[4])
+            if(timestamp > since):
+                message_dict = {
+                    "loginserver_record" : message[0],
+                    "target_pubkey" : message[1],
+                    "target_username" : message[2],
+                    "encrypted_message" : message[3],
+                    "sender_created_at" : message[4],
+                    "signature" : message[5]
+                }
+        payload = {
+            "response" : "ok",
+            "broadcasts" : broadcasts_since,
+            "private_messages" : messages_since
+        }
+        return json.dumps(payload)
 
 def verifyLoginserverRecord(loginserver_record):
 
@@ -193,6 +216,29 @@ def verifyBroadcastSignature(loginserver_record, message, timestamp, signature):
 def verifyPrivateMessage():
     
     return 1
+
+def rateLimit():
+    rate = 20.0
+    per = 5.0
+    if(cherrypy.session.get('last_check') == None or cherrypy.session.get('allowance') == None):
+        cherrypy.session['last_check'] = time.time()
+        cherrypy.session['allowance'] = rate
+    print(cherrypy.session['allowance'] )
+
+    current = time.time()
+    time_passed = current - cherrypy.session['last_check']
+    cherrypy.session['last_check'] = current
+    print(time_passed)
+    cherrypy.session['allowance'] += time_passed * (rate / per)
+    if (cherrypy.session['allowance'] > rate):
+        cherrypy.session['allowance'] = rate
+    if (cherrypy.session['allowance'] < 1.0):
+        return True
+    else:
+        cherrypy.session['allowance'] = cherrypy.session['allowance'] - 1.0
+        return False
+
+
 
 
         
