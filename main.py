@@ -45,8 +45,7 @@ def runMainApp():
             'tools.sessions.timeout':60* 1, #timeout is in minutes, * 60 to get hours
 
             # The default session backend is in RAM. Other options are 'file',
-            'tools.sessions.storage_class': cherrypy.lib.sessions.FileSession,
-            'tools.sessions.storage_path': 'tmp/mysessions',
+
         },
 
         #configuration for the static assets directory

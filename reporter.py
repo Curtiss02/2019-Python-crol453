@@ -95,6 +95,7 @@ def updateStatus():
         publicKey = user[2]
         api_key = user[1]
         username = user[0]
+        status = user[4]
         #create HTTP BASIC authorization header
         headers = http_funcs.getAuthenticationHeader(username, api_key)
-        data = loginserver_api.report(LOCATION, str(IP), publicKey, "online", headers)
+        data = loginserver_api.report(LOCATION, str(IP), publicKey, status, headers)

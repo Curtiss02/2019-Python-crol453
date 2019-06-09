@@ -29,15 +29,7 @@ class MainApp(object):
     @cherrypy.expose
     @cherrypy.tools.json_in()
     def default(self, *args, **kwargs):
-        """The default page, given when we don't recognise where the request is for."""
-        try:
-            input_json = cherrypy.request.json
-        except:
-            input_json = None
-        response = {
-            "response" : "bad-api-call"
-        }
-        return json.dumps(response)
+        return "<html><body>404</body></html>"
 
     @cherrypy.expose
     def test(self):
@@ -96,6 +88,8 @@ class MainApp(object):
             msg = input_json['message']
             timestamp = input_json['sender_created_at']
             sig = input_json['signature']
+            if(len(msg) > 256):
+                return json.dumps({"response": "error", "message" : "brpadcast exceeds length limit"})
             
         except KeyError:
             result = {
@@ -197,6 +191,7 @@ def verifyBroadcastSignature(loginserver_record, message, timestamp, signature):
         print(e)
         return False
 def verifyPrivateMessage():
+    
     return 1
 
 

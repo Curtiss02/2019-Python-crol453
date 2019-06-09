@@ -4,12 +4,12 @@ db = os.getcwd() + '/db/stuff.db'
 
 
 
-def add_client_user(username, api_key, public_key, private_key, loginserver_record):
+def add_client_user(username, api_key, public_key, loginserver_record):
 
-    data = (username, api_key, public_key, private_key, loginserver_record)
+    data = (username, api_key, public_key, loginserver_record)
     conn = sqlite3.connect(db)
-    sql = ''' INSERT INTO users(username, api_key, public_key, private_key, loginserver_record)
-              VALUES(?,?,?,?,?) '''
+    sql = ''' INSERT INTO users(username, api_key, public_key, loginserver_record)
+              VALUES(?,?,?,?) '''
     cur = conn.cursor()
     cur.execute(sql, data)
     conn.commit()
@@ -120,7 +120,7 @@ def get_broadcasts():
     conn.commit()
     return rows
 def addKeyPair(username,publicKey, privateKey):
-    data = (username, privateKey, publicKey)
+    data = (username, publicKey, privateKey)
     conn = sqlite3.connect(db)
     sql = ''' INSERT INTO keys(username, publickey, privatekey)
               VALUES(?,?,?) '''
@@ -170,3 +170,48 @@ def getLocalPrivateMessagesfromUser(sender):
     rows = cur.fetchall()
     conn.commit()
     return rows
+def getFilterWordForUser(username):
+    data = [username]
+    conn = sqlite3.connect(db)
+    sql = ''' SELECT string FROM filter WHERE username=?'''
+    cur = conn.cursor()
+    cur.execute(sql, data)
+    rows = cur.fetchall()
+    conn.commit()
+    return rows
+def addFilterWordForUser(username, string):
+    data = (username, string)
+    conn = sqlite3.connect(db)
+    sql = '''INSERT INTO filter(username, string)
+                VALUES(?,?)
+          '''
+    cur = conn.cursor()
+    cur.execute(sql, data)
+    rows = cur.fetchall()
+    conn.commit()
+def removeFilterWordForUser(username, string):
+    data = (username, string)
+    conn = sqlite3.connect(db)
+    sql = '''DELETE FROM filter WHERE username=? AND string=?
+          '''
+    cur = conn.cursor()
+    cur.execute(sql, data)
+    conn.commit()
+def updateStatusforUser(username, status):
+    data =(status, username)
+    conn = sqlite3.connect(db)
+    sql = """ UPDATE users
+              SET status = ?
+              WHERE username = ?"""
+    cur = conn.cursor()
+    cur.execute(sql, data)
+    conn.commit()
+def add2FAHAsh(username, pwhash):
+    data = (username, pwhash)
+    conn = sqlite3.connect(db)
+    sql = '''INSERT INTO 2fa(username, pwhash)
+                VALUES(?,?)
+          '''
+    cur = conn.cursor()
+    cur.execute(sql, data)
+    conn.commit()

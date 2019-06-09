@@ -19,7 +19,7 @@ def getNavbar(username):
             <a class="nav-link" href="/private">Private Messages</a>
         </li>
         </ul>
-        <span class="navbar-text">""" + username + """</span>
+        <a href="/account"><span class="navbar-text">""" + username + """</span></a>
         <span class="navbar-text"></span>
         <a class="btn btn-primary" href="/signout" role="button">Sign Out</a>
     </div>
@@ -46,10 +46,6 @@ login_form = """<div class="row"><div class="col-sm-9 col-md-7 col-lg-5 mx-auto"
                     <label for="inputPassword">Password</label>
                     <input type="password" name="password" class="form-control" id="inputPassword" placeholder="Password">
                 </div>
-                <div class="form-check">
-                    <input type="checkbox" name="hidden" class="form-check-input" id="hiddenmode">
-                    <label class="form-check-label" for="hiddenmode">Hidden from Online User List (No Report)</label>
-                </div>
                 <button type="submit" class="btn btn-primary">Submit</button>
                 </form>
                 </div></div></div></div>"""
@@ -68,3 +64,50 @@ pills = """<div class=\"container\"><div class=\"row\">
 </div>
 </div>
 </div>"""
+
+userlist_head = """<table class="table">
+    <thead class="thead-dark">
+    <tr>
+    <th scope="col">Username</th>
+    <th scope="col">Send Message</th>
+    <th scope="col">Connection Address</th>
+    <th scope="col">Connection Location</th>
+    <th scope="col">Public Key</th>
+    <th scope="col">Last Seen</th>
+    <th scope="col">Status</th>
+    <th scope="col">Reachable</th>
+    </tr>
+    </thead>
+    <tbody>"""
+
+messagemodal = """<div class="modal fade" id="messagemodal" tabindex="-1" role="dialog" aria-labelledby="messagemodalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="messagemodalLabel">New message</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form action="/send_private" method="post" enctype="multipart/form-data">
+          <div class="form-group">
+            <label for="recipient-name" class="col-form-label">Username:</label>
+            <input type="text" name="recipient" class="form-control" id="recipient-name">
+          </div>
+          <div class="form-group">
+            <label for="message-text" class="col-form-label">Message:</label>
+            <textarea class="form-control" name="message" id="message-text"></textarea>
+            <input type="hidden" id="prevurl" name="previous" value="users">
+          </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        <button type="submit" class="btn btn-primary">Send message</button>
+      </div>
+    </form>
+
+    </div>
+  </div>
+</div>
+"""
