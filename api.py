@@ -62,7 +62,7 @@ class MainApp(object):
         try:
             sender_record = input_json['loginserver_record']
             msg = input_json['message']
-            timestamp = input_json['sender_created_at']
+            timestamp = float(input_json['sender_created_at'])
             sig = input_json['signature']
             if(len(msg) > 256):
                 return json.dumps({"response": "error", "message" : "brpadcast exceeds length limit"})

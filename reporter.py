@@ -29,10 +29,10 @@ def main():
     updateUserList()
     pingcheck = Thread(target=pingCheckAll)
     pingcheck.start()
-    checkmessage = Thread(target=checkMessagesAll)
-    checkmessage.start()
+    #checkmessage = Thread(target=checkMessagesAll)
+    #checkmessage.start()
 
-    checkmessage.join(30)
+    #checkmessage.join(30)
     pingcheck.join()
 
     

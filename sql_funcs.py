@@ -205,15 +205,7 @@ def updateStatusforUser(username, status):
     cur = conn.cursor()
     cur.execute(sql, data)
     conn.commit()
-def add2FAHAsh(username, pwhash):
-    data = (username, pwhash)
-    conn = sqlite3.connect(db)
-    sql = '''INSERT INTO 2fa(username, pwhash)
-                VALUES(?,?)
-          '''
-    cur = conn.cursor()
-    cur.execute(sql, data)
-    conn.commit()
+
 def getAllPrivateMessages():
     conn = sqlite3.connect(db)
     sql = '''SELECT * FROM privatemessages'''

@@ -100,6 +100,8 @@ class MainApp(object):
                 loginReport()
                 addUserInfo()
                 reporter.updateUserList()
+                checkmessage = Thread(target=reporter.checkMessagesAll)
+                checkmessage.start()
             except:
                 raise cherrypy.HTTPRedirect('/login?bad_attempt=1')
             raise cherrypy.HTTPRedirect('/')
@@ -188,14 +190,7 @@ class MainApp(object):
             sql_funcs.updateStatusforUser(cherrypy.session['username'], status)
 
         raise cherrypy.HTTPRedirect('/account')
-    @cherrypy.expose
-    def set2fa(self, password=None):
-        if(cherrypy.session.get('username') == None):
-            raise cherrypy.HTTPRedirect('/login')
-        if(password):
-            pwhash = nacl.pwhash.str(password)
-            sql_funcs.add2FAHAsh(cherrypy.session.get('username'), pwhash)
-            encryptKeysWith2FA(password)
+
     
     @cherrypy.expose
     def blockuser(self, blockeduser = None, unblock=None):
@@ -407,6 +402,7 @@ def displayBroadcasts():
         if(any(username.lower() in blockedUser.lower() for blockedUser in blockedUsers)):
             continue
         timestamp = row[2]
+    
         int_timestamp = int(float(timestamp))
         
         readable_timestamp = time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime(int_timestamp))
@@ -526,14 +522,18 @@ def displayPrivateMessages():
     filter_strings = sql_funcs.getFilterWordForUser(cherrypy.session['username'])
     filter_strings = [word[0] for word in filter_strings]
 
-
+    blockedUsers = sql_funcs.getBlockedUsers(cherrypy.session['username'])
+    blockedUsers = [user[0] for user in blockedUsers]
     #Disgusting HTML Stuff
     for user in conversationUsers:
+        if(user in blockedUsers):
+            continue
         html += """<a class="nav-link" id="v-pills-""" + user + """-tab" data-toggle="pill" href="#v-pills-""" + user + """" role="tab" aria-controls="v-pills-""" + user + """" aria-selected="false">""" + user + """</a>"""   
     html += """</div>"""
     html += """<div class="tab-content mx-auto" id="v-pills-tabContent" style="height: 100%;">"""
     for user in conversationUsers:
-        
+        if(user in blockedUsers):
+            continue
         html += """ <div class="tab-pane fade w-80" id="v-pills-""" + user +"""" role="tabpanel" aria-labelledby="v-pills-""" + user + """-tab">"""
         for msg in messageList:
             if any(string.lower() in msg['message'].lower() for string in filter_strings):
@@ -545,7 +545,7 @@ def displayPrivateMessages():
                     html +=  markdown.markdown(msg['message']) 
                     html +=  """</p>
                         <span class="time-right">""" 
-                    html += msg['sender']
+                    html += cgi.escape(msg['sender'])
                     html += ": " 
                     html += str(time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime(int(float(msg['timestamp'])))))
 
@@ -558,7 +558,7 @@ def displayPrivateMessages():
                 html +=  markdown.markdown(msg['message']) 
                 html +=  """</p>
 	                <span class="time-right">""" 
-                html += msg['sender']
+                html += cgi.escape(msg['sender'])
                 html += ": " 
                 html += str(time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime(int(float(msg['timestamp'])))))
                 html += """</span>
@@ -569,7 +569,7 @@ def displayPrivateMessages():
                 html +=  markdown.markdown(msg['message']) 
                 html +=  """</p>
 	                <span class="time-left">""" 
-                html += msg['sender']
+                html += cgi.escape(msg['sender'])
                 html += ": " 
                 html += str(time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime(int(float(msg['timestamp'])))))
                 html += """</span>
@@ -578,7 +578,7 @@ def displayPrivateMessages():
         html += """<div class="form-group">
                     <label for="message"><strong>Message:</strong></label>
                     <input type="hidden" id="prevurl" name="previous" value="private">
-                    <input type="hidden" id="recipient" name="recipient" value=\"""" + user + """\">
+                    <input type="hidden" id="recipient" name="recipient" value=\"""" + cgi.escape(user) + """\">
                     <textarea class="form-control" class="rounded" rows="5" id="message" name="message"></textarea>
                     </div>"""
         html += '<input type="submit" value="Send"/></form>'
@@ -661,7 +661,7 @@ def displayAccountInfo():
     html += "<div class='row'>"
     for status in statuses:
         html += """<div class='col'><form action="/setstatus" method="post" enctype="multipart/form-data">
-                    <button type='submit' class='btn btn-primary' name='status' value='""" + status + "'>" + status + """</button>
+                    <button type='submit' class='btn btn-primary' name='status' value='""" + cgi.escape(status) + "'>" + cgi.escape(status) + """</button>
                     </form></div>"""
     html += "</div>"
 
@@ -684,7 +684,7 @@ def displayAccountInfo():
     </form></div>"""
     html += "<div class='col-lg><table class='table'><thead><th scope='col'><strong>Filtered Words:</strong></th></thead><tbody>"
     for word in filterWords:
-        html += "<tr><td><p>" + word + "</p></td></tr>"
+        html += "<tr><td><p>" + cgi.escape(word) + "</p></td></tr>"
     html += "</tbody></table></div></div>"
     html += "<div class='row'><h2>User Filtering</h2></div>"
     html += """<div class='row'><div class='col-lg'><form action="/blockuser" method="post" enctype="multipart/form-data">
@@ -705,7 +705,7 @@ def displayAccountInfo():
     </form></div>"""
     html += "<div class='col-lg><table class='table'><thead><th scope='col'><strong>Blocked Users:</strong></th></thead><tbody>"
     for user in blockedUsers:
-        html += "<tr><td><p>" + user + "</p></td></tr>"
+        html += "<tr><td><p>" + cgi.escape(user) + "</p></td></tr>"
     html += "</tbody></table></div></div>"
     return html
     
