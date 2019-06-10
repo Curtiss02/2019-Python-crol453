@@ -76,6 +76,7 @@ class MainApp(object):
         return Page
         
     @cherrypy.expose
+    #Dsiplays Login Page
     def login(self, bad_attempt = 0):
         Page = startHTML 
         Page += html_strings.jumbotron_login
@@ -96,6 +97,7 @@ class MainApp(object):
         
         if error == 0:
             try:
+
                 setKeys(username)
                 loginReport()
                 addUserInfo()
@@ -118,6 +120,7 @@ class MainApp(object):
             sql_funcs.remove_client_user(username)
             cherrypy.lib.sessions.expire()
         raise cherrypy.HTTPRedirect('/')
+    #Used to transmit broadcasts
     @cherrypy.expose
     def broadcast(self, message=None):
         if(cherrypy.session.get('username') == None):
@@ -126,7 +129,7 @@ class MainApp(object):
             send_broadcast(message)
         raise cherrypy.HTTPRedirect('/')
 
-
+    # User list page
     @cherrypy.expose
     def users(self):
         if(cherrypy.session.get('username') == None):
@@ -138,7 +141,7 @@ class MainApp(object):
             Page += displayUserList(userList)
             Page += endHTML 
             return Page
-
+    #used to send private messages
     @cherrypy.expose
     def send_private(self, recipient=None, message = None, previous=None):
         if(cherrypy.session.get('username') == None):
@@ -146,6 +149,7 @@ class MainApp(object):
         send_private_message(recipient, message)
         raise cherrypy.HTTPRedirect('/' + previous)
 
+    #Page for viewing private messages
     @cherrypy.expose
     def private(self):
         if(cherrypy.session.get('username') == None):
@@ -156,6 +160,7 @@ class MainApp(object):
             Page +=  displayPrivateMessages()
             Page += endHTML
             return Page
+    #Page for modifying account settings
     @cherrypy.expose
     def account(self):
         if(cherrypy.session.get('username') == None):
@@ -165,18 +170,21 @@ class MainApp(object):
         Page += displayAccountInfo()
         Page += endHTML
         return Page
+    #Adding word filter
     @cherrypy.expose
     def addfilter(self, filterstring = None):
         if(cherrypy.session.get('username') == None):
             raise cherrypy.HTTPRedirect('/login')
         sql_funcs.addFilterWordForUser(cherrypy.session.get('username'), filterstring)
         raise cherrypy.HTTPRedirect('/account')
+    #Removing word filter
     @cherrypy.expose
     def removefilter(self, filterstring = None):
         if(cherrypy.session.get('username') == None):
             raise cherrypy.HTTPRedirect('/login')
         sql_funcs.removeFilterWordForUser(cherrypy.session.get('username'), filterstring)
         raise cherrypy.HTTPRedirect('/account')
+    #Change user report status
     @cherrypy.expose
     def setstatus(self, status=None):
         if(cherrypy.session.get('username') == None):
@@ -191,7 +199,7 @@ class MainApp(object):
 
         raise cherrypy.HTTPRedirect('/account')
 
-    
+    #Block/unblock user
     @cherrypy.expose
     def blockuser(self, blockeduser = None, unblock=None):
         if(cherrypy.session.get('username') == None):
@@ -207,6 +215,7 @@ class MainApp(object):
 ###
 ### Functions only after here
 ###
+
 
 def generateNewKeyPair():
     privateKey = nacl.signing.SigningKey.generate()
@@ -264,6 +273,7 @@ def authLogin(username, password):
         return 1
 
 
+#Sets the keys to an existing keypair if available, otherwise generates new pair
 def setKeys(username):
     userKeys = getKeysforUser(username)
     #User previous keypair if found
@@ -285,7 +295,7 @@ def addUserInfo():
     sql_funcs.add_client_user(cherrypy.session['username'], cherrypy.session['api_key'], cherrypy.session['public_key'].encode(encoder=nacl.encoding.HexEncoder).decode('utf-8') , cherrypy.session['loginserver_record'])
     
 
-
+#Adds a new pubkey to the login server
 def addnewPubKey(publicKey, privateKey):
     
     username = cherrypy.session['username']
@@ -314,6 +324,7 @@ def addnewPubKey(publicKey, privateKey):
         print("ADD PUBKEY FAIL")
         return 1    
     
+#Sends the message as a broadcast from the user   
 def send_broadcast(message):
 
     privateKey = cherrypy.session['private_key']
@@ -340,6 +351,7 @@ def send_broadcast(message):
 
     userList = sql_funcs.getUserList()
     
+    #SEnd the broadcast to everybody in the user list
     ips = [user[1] for user in userList]
     ips = set(ips)
     print(ips)
@@ -392,13 +404,16 @@ def displayBroadcasts():
         
         message = row[1]
         signature = row[3]
+        #Filter blocked words
         if any(string.lower() in message.lower() for string in filter_strings):
             continue
+        #Filter meta
         if (message.lower().startswith("!meta")):
             continue
         fav_count = fav_sigs.count(signature)
         fav_string = "!Meta:favourite_broadcast:" + signature
         username = row[0].split(',')[0]
+        #Filter blocked users
         if(any(username.lower() in blockedUser.lower() for blockedUser in blockedUsers)):
             continue
         timestamp = row[2]
@@ -526,6 +541,7 @@ def displayPrivateMessages():
     blockedUsers = [user[0] for user in blockedUsers]
     #Disgusting HTML Stuff
     for user in conversationUsers:
+        #Filter blocked users
         if(user in blockedUsers):
             continue
         html += """<a class="nav-link" id="v-pills-""" + user + """-tab" data-toggle="pill" href="#v-pills-""" + user + """" role="tab" aria-controls="v-pills-""" + user + """" aria-selected="false">""" + user + """</a>"""   
@@ -536,6 +552,7 @@ def displayPrivateMessages():
             continue
         html += """ <div class="tab-pane fade w-80" id="v-pills-""" + user +"""" role="tabpanel" aria-labelledby="v-pills-""" + user + """-tab">"""
         for msg in messageList:
+            #Filter blocked words
             if any(string.lower() in msg['message'].lower() for string in filter_strings):
                 continue
             if (user == username):
