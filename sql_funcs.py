@@ -222,3 +222,29 @@ def getAllPrivateMessages():
     rows = cur.fetchall()
     conn.commit()
     return rows
+def addBlockedUser(username, blockeduser):
+    data = (username, blockeduser)
+    conn = sqlite3.connect(db)
+    sql = '''INSERT INTO blockedusers(username, blockeduser)
+                VALUES(?,?)
+          '''
+    cur = conn.cursor()
+    cur.execute(sql, data)
+    conn.commit()
+def removeBlockedUser(username, blockeduser):
+    data = (username, blockeduser)
+    conn = sqlite3.connect(db)
+    sql = '''DELETE FROM blockedusers WHERE username=? AND blockeduser=?
+          '''
+    cur = conn.cursor()
+    cur.execute(sql, data)
+    conn.commit()
+
+def getBlockedUsers(username):
+    conn = sqlite3.connect(db)
+    sql = '''SELECT blockeduser FROM blockedusers WHERE username = ?'''
+    cur = conn.cursor()
+    cur.execute(sql, [username])
+    rows = cur.fetchall()
+    conn.commit()
+    return rows

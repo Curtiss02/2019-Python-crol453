@@ -16,14 +16,13 @@ import html_strings
 import markdown
 from threading import Thread
 import loginserver_api
+import reporter
 
-SERVER_IP = ''
-LOCATION = ''
 LOCAL_IP = "localhost:10000"
-with open('cfg/ip.ini') as json_file:
-    ip_data = json.load(json_file)
-    SERVER_IP = ip_data['SERVER_IP']
-    SERVER_LOCATION = ip_data['SERVER_LOCATION']
+
+
+SERVER_IP = socket.gethostbyname(socket.gethostname()) + ":10000"
+SERVER_LOCATION = '0'
 
 startHTML = """<html><head><title>Chatter</title><link rel='stylesheet'type='text/css' href='static/example.css' /><link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous"></head><body>"""
 
@@ -96,9 +95,13 @@ class MainApp(object):
         error = authLogin(username, password)
         
         if error == 0:
-            setKeys(username)
-            loginReport()
-            addUserInfo()
+            try:
+                setKeys(username)
+                loginReport()
+                addUserInfo()
+                reporter.updateUserList()
+            except:
+                raise cherrypy.HTTPRedirect('/login?bad_attempt=1')
             raise cherrypy.HTTPRedirect('/')
         else:
             raise cherrypy.HTTPRedirect('/login?bad_attempt=1')
@@ -193,7 +196,16 @@ class MainApp(object):
             pwhash = nacl.pwhash.str(password)
             sql_funcs.add2FAHAsh(cherrypy.session.get('username'), pwhash)
             encryptKeysWith2FA(password)
-
+    
+    @cherrypy.expose
+    def blockuser(self, blockeduser = None, unblock=None):
+        if(cherrypy.session.get('username') == None):
+            raise cherrypy.HTTPRedirect('/login')
+        if(unblock == '0'):
+            sql_funcs.addBlockedUser(cherrypy.session['username'], blockeduser)
+        elif(unblock == '1'):
+            sql_funcs.removeBlockedUser(cherrypy.session['username'], blockeduser)
+        raise cherrypy.HTTPRedirect('/account')
                 
 
 
@@ -361,6 +373,8 @@ def displayBroadcasts():
     filter_strings = sql_funcs.getFilterWordForUser(cherrypy.session['username'])
     filter_strings = [word[0] for word in filter_strings]
     msg = []
+    blockedUsers = sql_funcs.getBlockedUsers(cherrypy.session['username'])
+    blockedUsers = [user[0] for user in blockedUsers]
 
     #Get favourited broadcast meta messages
     meta_messages = [row[1] for row in broadcasts if row[1].lower().startswith('!meta:favourite_broadcast')]
@@ -378,7 +392,7 @@ def displayBroadcasts():
             <div class="col-sm"><label for="search_user" class="col-form-label">Search Users:</label>
             <input type="text" onkeyup="searchBroadcasts()" placeholder="Search for messages from user..." class="form-control" id="search_user"></div></div></div> """
     html += "<div class=\"d-flex justify-content-center\"><h1>Public Broadcasts</h1></div>"
-
+    print(blockedUsers)
     for row in broadcasts:
         
         message = row[1]
@@ -390,6 +404,8 @@ def displayBroadcasts():
         fav_count = fav_sigs.count(signature)
         fav_string = "!Meta:favourite_broadcast:" + signature
         username = row[0].split(',')[0]
+        if(any(username.lower() in blockedUser.lower() for blockedUser in blockedUsers)):
+            continue
         timestamp = row[2]
         int_timestamp = int(float(timestamp))
         
@@ -502,6 +518,7 @@ def displayPrivateMessages():
     html = "<div class=\"container\"><div class=\"row\">"
     html += """ <div class="nav flex-column nav-pills" id="v-pills-tab" role="tablist" aria-orientation="vertical"> """
     messageList = getConversations(username)
+    
     conversationUsers = [msg['receiver'] for msg in messageList]
     conversationUsers = conversationUsers + [msg['sender'] for msg in messageList]
     conversationUsers = set(conversationUsers)
@@ -634,6 +651,7 @@ def getKeysforUser(username):
         return False
 def displayAccountInfo():
     filterWords = [word[0] for word in sql_funcs.getFilterWordForUser(cherrypy.session['username'])]
+    blockedUsers = [user[0] for user in sql_funcs.getBlockedUsers(cherrypy.session['username'])]
     html =  """<div class="jumbotron text-center" style="background-color: #e3f2fd;">
                 <h1>Account Settings</h1>
                 </div>
@@ -667,6 +685,27 @@ def displayAccountInfo():
     html += "<div class='col-lg><table class='table'><thead><th scope='col'><strong>Filtered Words:</strong></th></thead><tbody>"
     for word in filterWords:
         html += "<tr><td><p>" + word + "</p></td></tr>"
+    html += "</tbody></table></div></div>"
+    html += "<div class='row'><h2>User Filtering</h2></div>"
+    html += """<div class='row'><div class='col-lg'><form action="/blockuser" method="post" enctype="multipart/form-data">
+          <div class="form-group">
+            <label for="filter-word" class="col-form-label">User to block:</label>
+            <input type="text" name="blockeduser" class="form-control" id="filter-word">
+            <input type="hidden" name="unblock" value="0">
+            <button type="submit" class="btn btn-primary">Block User</button>
+          </div>
+    </form>"""
+    html += """<form action="/blockuser" method="post" enctype="multipart/form-data">
+          <div class="form-group">
+            <label for="filter-word" class="col-form-label">Users to unblock:</label>
+            <input type="text" name="blockeduser" class="form-control" id="filter-word">
+            <input type="hidden" name="unblock" value="1">
+            <button type="submit" class="btn btn-primary">Unblock User</button>
+          </div>
+    </form></div>"""
+    html += "<div class='col-lg><table class='table'><thead><th scope='col'><strong>Blocked Users:</strong></th></thead><tbody>"
+    for user in blockedUsers:
+        html += "<tr><td><p>" + user + "</p></td></tr>"
     html += "</tbody></table></div></div>"
     return html
     

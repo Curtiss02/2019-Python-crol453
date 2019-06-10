@@ -7,36 +7,50 @@ import json
 import loginserver_api
 import time
 import traceback
-
+from threading import Thread
 import concurrent.futures
+import socket
 
 
-IP = ''
-LOCATION = ''
-with open('cfg/ip.ini') as json_file:
-    ip_data = json.load(json_file)
-    IP = ip_data['SERVER_IP']
-    LOCATION = ip_data['SERVER_LOCATION']
+#Reads in the IP/Location from the config file
+#used for reporting user status to login server
+IP = socket.gethostbyname(socket.gethostname()) + ":10000"
+LOCATION = '0'
 
 
+#with open('cfg/ip.ini') as json_file:
+#    ip_data = json.load(json_file)
+#    IP = ip_data['SERVER_IP']
+#    LOCATION = ip_data['SERVER_LOCATION']
+
+#Contains all the functions called by the reporter
 def main():
     updateStatus()
     updateUserList()
-    pingCheckAll()
-    checkMessagesAll()
+    pingcheck = Thread(target=pingCheckAll)
+    pingcheck.start()
+    checkmessage = Thread(target=checkMessagesAll)
+    checkmessage.start()
+
+    checkmessage.join(30)
+    pingcheck.join()
+
     
 
+#Ping checks every user on the user list, doing 20 at a time using a threadpool
 def pingCheckAll():
     userList = sql_funcs.getUserList()
     with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
         executor.map(pingCheck, userList)
+
+#Checks for missed broadcasts/messages from other users, using a threadpool
 def checkMessagesAll():
     userList = sql_funcs.getUserList()
     with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
         executor.map(checkMessages, userList)
-    
+
+#Checks for missed messages and broadcasts at the given ip    
 def checkMessages(userinfo):
-    print("Checking messages from: " + userinfo[0])
     mytime = time.time()
     url = "http://" + userinfo[1] + "/api/checkmessages"
     payload = {
@@ -46,7 +60,6 @@ def checkMessages(userinfo):
         data = http_funcs.sendJsonRequest(url, payload=payload)
 
     except Exception as e:
-        print(e)
         return
     try:
         if[data['response'] == 'ok']:
@@ -54,19 +67,17 @@ def checkMessages(userinfo):
             messages = data['private_messages']
             for broadcast in broadcasts:
                 data = http_funcs.sendJsonRequest("http://localhost:10000/api/rx_broadcast", payload=broadcast)
-            print("Added some broadcasts")
             for message in messages:
                 data = http_funcs.sendJsonRequest("http://localhost:10000/api/rx_privatemessage", payload=message)
-            print("Added some messages")
         else:
             return
     except Exception as e:
         print(e)
         return
-
+#Performs a pingcheck on the given user
 def pingCheck(userinfo):
     #Cant ping_check login server
-    print("Ping checking: " + userinfo[0])
+    #print("Ping checking: " + userinfo[0])
     try:
         url = "http://" + userinfo[1] + "/api/ping_check"
         if(userinfo[0] == "admin"):
@@ -100,6 +111,8 @@ def pingCheck(userinfo):
             return
     except:
         pass
+
+#Updates the userlist page in the background, to prevent long load times for users
 def updateUserList():
     #Can only do if atleast one user is online
     online_users = sql_funcs.get_all_client_users()
@@ -121,7 +134,7 @@ def updateUserList():
             
         
 
-
+#Updates clients users' status to whatever they have set on their account preferences: defaults to online
 def updateStatus():
     onlineUsers = sql_funcs.get_all_client_users()
     for user in onlineUsers:

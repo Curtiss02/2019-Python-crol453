@@ -79,8 +79,10 @@ def runMainApp():
 
     #cherrypy.tools.auth = cherrypy.Tool('before_handler', auth.check_auth, 99)
 
-    print("Curtiss Rollinson Python Webserver")                 
-    cherrypy.engine.reporter = cherrypy.process.plugins.BackgroundTask(60, reporter.main)
+    print("crol453 Python Webserver")                 
+
+    #Start the routine background tasks
+    cherrypy.engine.reporter = cherrypy.process.plugins.BackgroundTask(120, reporter.main)
     cherrypy.engine.reporter.start()
     # Start the web server
     cherrypy.engine.start()
@@ -88,12 +90,95 @@ def runMainApp():
     # And stop doing anything else. Let the web server take over.
     cherrypy.engine.block()
  
-#Run the function to start everything
 def setupDB():
-    db = os.getcwd() + '/db/stuff.db'       
+    db = os.getcwd() + '/db/stuff.db'     
+
+
+    db_commands=[
+        """CREATE TABLE IF NOT EXISTS broadcasts (
+    loginserver_record TEXT,
+    message            TEXT,
+    timestamp          REAL,
+    signature          TEXT,
+    UNIQUE (
+        message,
+        timestamp
+    )
+    ON CONFLICT REPLACE
+);
+""",
+"""CREATE TABLE IF NOT EXISTS filter (
+    username TEXT,
+    string   TEXT
+);
+""",
+"""CREATE TABLE IF NOT EXISTS keys (
+    username   TEXT,
+    publickey  TEXT UNIQUE ON CONFLICT REPLACE,
+    privatekey TEXT PRIMARY KEY
+                    UNIQUE ON CONFLICT REPLACE
+);
+""",
+"""CREATE TABLE IF NOT EXISTS localprivatemessages (
+    sender    TEXT,
+    receiver  TEXT,
+    message   TEXT,
+    timestamp REAL
+);
+""",
+"""CREATE TABLE IF NOT EXISTS privatemessages (
+    loginserver_record TEXT,
+    target_pubkey      TEXT,
+    target_username    TEXT,
+    encrypted_message  TEXT,
+    timestamp          REAL,
+    signature          TEXT,
+    UNIQUE (
+        target_pubkey,
+        target_username,
+        encrypted_message,
+        timestamp
+    )
+    ON CONFLICT REPLACE
+);
+""",
+"""CREATE TABLE IF NOT EXISTS userlist (
+    Username            TEXT PRIMARY KEY ON CONFLICT REPLACE,
+    connection_address  TEXT DEFAULT unknown
+                             NOT NULL ON CONFLICT IGNORE,
+    connection_location TEXT,
+    publickey           TEXT,
+    status              TEXT,
+    lastseen            TEXT,
+    reachable           TEXT DEFAULT Unknown
+);
+""",
+"""CREATE TABLE IF NOT EXISTS users (
+    username           TEXT PRIMARY KEY ON CONFLICT REPLACE
+                            NOT NULL,
+    api_key            TEXT,
+    public_key         TEXT,
+    loginserver_record TEXT,
+    status             TEXT DEFAULT online
+);
+""",
+"""CREATE TABLE IF NOT EXISTS blockedusers (
+    username    TEXT,
+    blockeduser TEXT,
+    UNIQUE (
+        username,
+        blockeduser
+    )
+    ON CONFLICT REPLACE
+);
+"""
+    ]  
     try:
         conn = sqlite3.connect(db)
-
+        for sql in db_commands:
+            cur = conn.cursor()
+            cur.execute(sql)
+            conn.commit()
                                         
     except Error as e:
         print(e)
@@ -102,5 +187,5 @@ def setupDB():
 
 
 if __name__ == '__main__':
-    #setupDB()
+    setupDB()
     runMainApp()

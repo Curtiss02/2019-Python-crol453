@@ -14,7 +14,7 @@ import binascii
 import loginserver_api
 
 
-LOCAL_IP = socket.gethostbyname(socket.gethostname()) + ":8080"
+LOCAL_IP = socket.gethostbyname(socket.gethostname()) + ":10000"
 
 
 
@@ -67,19 +67,19 @@ class MainApp(object):
             if(len(msg) > 256):
                 return json.dumps({"response": "error", "message" : "brpadcast exceeds length limit"})
             
-        except KeyError:
+        except:
             result = {
                 "response" : "error",
                 "message" : "missing field"}
             return json.dumps(result)
-        verifyLoginserverRecord(sender_record)
+        
+        #BROKE: verifyLoginserverRecord(sender_record)
         if(not(verifyBroadcastSignature(sender_record, msg, timestamp, sig))):
             print("FAIL VERIFY")
             result = {
                 "response" : "error",
                 "message" : "bad signature"}
             return json.dumps(result)
-        print(sender_record, msg, timestamp, sig)
         sql_funcs.add_broadcast(sender_record, msg, timestamp, sig)
        
 
@@ -105,7 +105,7 @@ class MainApp(object):
         except KeyError:
             response = "error"
             message = "missing field"
-                   
+
         timestamp =  str(time.time())
         result = {"response" : response, "message": message, "my_time": timestamp}
         return json.dumps(result)
@@ -125,11 +125,18 @@ class MainApp(object):
             target_pubkey = input_json['target_pubkey']
             target_username = input_json['target_username']
             encrypted_message = input_json['encrypted_message']
-            timestamp = input_json['sender_created_at']
+            timestamp = float(input_json['sender_created_at'])
             signature = input_json['signature']
         except KeyError:
             return json.dumps({"response" : "error", "message" : "missing field"})
-
+        
+        if(not(verifyPrivateMessage(loginserver_record, target_pubkey, target_username, encrypted_message, timestamp, signature))):
+            print("FAIL VERIFY")
+            result = {
+                "response" : "error",
+                "message" : "bad signature"}
+            return json.dumps(result)
+        
         sql_funcs.addPrivateMessage(loginserver_record, target_pubkey, target_username, encrypted_message, timestamp, signature)
         return json.dumps({"response" : "ok"})
     @cherrypy.expose
@@ -150,13 +157,16 @@ class MainApp(object):
         for broadcast in broadcast_rows:
             timestamp = float(broadcast[2])
             if(timestamp > since):
-                broadcast_dict = {
-                    "loginserver_record" : broadcast[0],
-                    "message" : broadcast[1],
-                    "sender_created_at" : broadcast[2],
-                    "signature" : broadcast[3]
-                }
-                broadcasts_since.append(broadcast_dict)
+                try:
+                    broadcast_dict = {
+                        "loginserver_record" : broadcast[0],
+                        "message" : broadcast[1],
+                        "sender_created_at" : broadcast[2],
+                        "signature" : broadcast[3]
+                    }
+                    broadcasts_since.append(broadcast_dict)
+                except:
+                    continue
         message_rows = sql_funcs.getAllPrivateMessages()
         messages_since = []
         for message in message_rows:
@@ -190,13 +200,11 @@ def verifyLoginserverRecord(loginserver_record):
         verify_key = server_pubkey
         sig_bytes = binascii.unhexlify(sig)
         msg_bytes = bytes(username + pubkey + timestamp, 'utf-8')
-        print(msg_bytes)
 
         verify_key.verify(msg_bytes, sig_bytes)
 
         return True
     except Exception as e:
-        print(e)
         return False
 
 
@@ -207,14 +215,24 @@ def verifyBroadcastSignature(loginserver_record, message, timestamp, signature):
         message = message
         verify_key = nacl.signing.VerifyKey(pubkey, encoder=nacl.encoding.HexEncoder)
         sig_bytes = binascii.unhexlify(signature)
-        msg_bytes = bytes(loginserver_record + message + timestamp, 'utf-8')
+        msg_bytes = bytes(loginserver_record + message + str(timestamp), 'utf-8')
         verify_key.verify(msg_bytes, sig_bytes)
         return True
     except Exception as e:
         print(e)
         return False
-def verifyPrivateMessage():
-    
+def verifyPrivateMessage(loginserver_record, target_pubkey, target_username, encrypted_message, timestamp, signature):
+    try:
+        pubkey = loginserver_record.split(',')[1]
+        verify_key = nacl.signing.VerifyKey(pubkey, encoder=nacl.encoding.HexEncoder)
+
+        sig_bytes = binascii.unhexlify(signature)
+        msg_bytes = bytes(loginserver_record + target_pubkey + target_username + str(encrypted_message) + str(timestamp), 'utf-8')
+        verify_key.verify(msg_bytes, sig_bytes)
+        return True
+    except Exception as e:
+        print(e)
+        return False
     return 1
 
 def rateLimit():
@@ -223,16 +241,15 @@ def rateLimit():
     if(cherrypy.session.get('last_check') == None or cherrypy.session.get('allowance') == None):
         cherrypy.session['last_check'] = time.time()
         cherrypy.session['allowance'] = rate
-    print(cherrypy.session['allowance'] )
 
     current = time.time()
     time_passed = current - cherrypy.session['last_check']
     cherrypy.session['last_check'] = current
-    print(time_passed)
     cherrypy.session['allowance'] += time_passed * (rate / per)
     if (cherrypy.session['allowance'] > rate):
         cherrypy.session['allowance'] = rate
     if (cherrypy.session['allowance'] < 1.0):
+        print("HIT RATE LIMIT")
         return True
     else:
         cherrypy.session['allowance'] = cherrypy.session['allowance'] - 1.0

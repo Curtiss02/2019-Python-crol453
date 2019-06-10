@@ -3,7 +3,7 @@ import html
 import parser
 import re
 
-
+#Implements markdown on the provided text
 def markdown(text):
     #Remove any HTML markup at the start so that we can add our own later
     text = cgi.escape(text)

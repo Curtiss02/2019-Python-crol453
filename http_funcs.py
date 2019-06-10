@@ -24,13 +24,12 @@ def sendJsonRequest(url,payload = None, header = None):
 
     try:
         req = urllib.request.Request(url, data=payload, headers=header)
-        response = urllib.request.urlopen(req)
+        response = urllib.request.urlopen(req, timeout=4)
         data = response.read() # read the received bytes
         encoding = response.info().get_content_charset('utf-8') #load encoding if possible (default to utf-8)
         response.close()
         data = json.loads(data.decode(encoding))
     except Exception as ex:
-        print(ex)
         return 1
     return data
 
